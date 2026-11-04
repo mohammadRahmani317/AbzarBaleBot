@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "categoryCode": "POWER_TOOLS",
+    "name": "دریل شارژی",
+    "description": "دریل شارژی مناسب مصارف عمومی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/Yellow and Black Cordless Drill-1.png"
+  },
+  {
+    "id": 2,
+    "categoryCode": "POWER_TOOLS",
+    "name": "مینی‌فرز",
+    "description": "مینی‌فرز مناسب برش و سایش",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/Teal and Black Angle Grinder-2.png"
+  },
+  {
+    "id": 3,
+    "categoryCode": "HAND_TOOLS",
+    "name": "انبردست",
+    "description": "انبردست عمومی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/Red and Black Lineman Pliers-3.png"
+  },
+  {
+    "id": 4,
+    "categoryCode": "HAND_TOOLS",
+    "name": "پیچ‌گوشتی دوسو",
+    "description": "پیچ‌گوشتی دوسو",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/screwdriver-flat.jpg"
+  },
+  {
+    "id": 5,
+    "categoryCode": "HAND_TOOLS",
+    "name": "پیچ‌گوشتی چهارسو",
+    "description": "پیچ‌گوشتی چهارسو",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/screwdriver-phillips.jpg"
+  },
+  {
+    "id": 6,
+    "categoryCode": "HAND_TOOLS",
+    "name": "متر ۵ متری",
+    "description": "متر اندازه‌گیری ۵ متری",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/measuring-tape.jpg"
+  }
+]
