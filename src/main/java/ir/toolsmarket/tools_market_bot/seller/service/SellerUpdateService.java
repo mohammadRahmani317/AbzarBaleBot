@@ -107,6 +107,24 @@ public class SellerUpdateService {
             return;
         }
 
+        // نمایش سفارش‌های ثبت‌شده
+        if ("📦 مشاهده سفارش‌ها".equals(text)) {
+
+            var userOptional = userAccessService.findByChatId(chatId);
+
+            if (userOptional.isEmpty()
+                    || userOptional.get().status() != UserStatus.APPROVED
+//                    || userOptional.get().role() == UserRole.SUPER_ADMIN
+//                    || userOptional.get().role() == UserRole.ADMIN
+            ) {
+
+                return;
+            }
+
+            sellerMenuService.showOrders(chatId);
+            return;
+        }
+
         // نمایش درخواست‌های دسترسی
         if ("👥 درخواست‌های دسترسی".equals(text)) {
 
@@ -261,6 +279,7 @@ public class SellerUpdateService {
         }
     }
 
+
     private void handleCallbackQuery(JsonNode callbackQuery) {
 
         String callbackQueryId = callbackQuery.path("id").asText();
@@ -271,7 +290,11 @@ public class SellerUpdateService {
 
         String callbackData = callbackQuery.path("data").asText();
 
-        baleBotClient.answerCallbackQuery(callbackQueryId);
+        try {
+            baleBotClient.answerCallbackQuery(callbackQueryId);
+        } catch (Exception e) {
+            log.warn("پاسخ به درخواست دکمه بله ناموفق بود: {}", e.getMessage());
+        }
 
         // بررسی دسترسی مدیر
         var adminOptional = userAccessService.findByChatId(adminChatId);
@@ -283,8 +306,8 @@ public class SellerUpdateService {
 
         var role = adminOptional.get().role();
 
-        if (role != ir.toolsmarket.tools_market_bot.model.UserRole.SUPER_ADMIN
-                && role != ir.toolsmarket.tools_market_bot.model.UserRole.ADMIN) {
+        if (role != UserRole.SUPER_ADMIN
+                && role != UserRole.ADMIN) {
             return;
         }
 
@@ -310,7 +333,6 @@ public class SellerUpdateService {
         // بازگرداندن درخواست ردشده به حالت انتظار بررسی
         if (callbackData.startsWith("access:reopen:")) {
 
-            // فقط مدیر اصلی اجازه بررسی مجدد دارد
             if (role != UserRole.SUPER_ADMIN) {
                 baleBotClient.sendMessage(
                         adminChatId,
@@ -323,12 +345,12 @@ public class SellerUpdateService {
                     callbackData.substring("access:reopen:".length());
 
             reopenAccessRequest(adminChatId, targetChatId);
+            return;
         }
 
         // ارتقای فروشنده به مدیر
         if (callbackData.startsWith("access:promote:")) {
 
-            // فقط مدیر اصلی اجازه ارتقای کاربران را دارد
             if (role != UserRole.SUPER_ADMIN) {
                 baleBotClient.sendMessage(
                         adminChatId,
@@ -344,6 +366,24 @@ public class SellerUpdateService {
             return;
         }
 
+        // تنزل مدیر به فروشنده
+        if (callbackData.startsWith("access:demote:")) {
+
+            if (role != UserRole.SUPER_ADMIN) {
+                baleBotClient.sendMessage(
+                        adminChatId,
+                        "فقط مدیر اصلی اجازه تغییر نقش مدیران را دارد."
+                );
+                return;
+            }
+
+            String targetChatId =
+                    callbackData.substring("access:demote:".length());
+
+            demoteAdmin(adminChatId, targetChatId);
+            return;
+        }
+
         // غیرفعال‌کردن فروشنده
         if (callbackData.startsWith("access:deactivate:")) {
 
@@ -354,10 +394,29 @@ public class SellerUpdateService {
             return;
         }
 
+        // غیرفعال‌کردن مدیر
+        if (callbackData.startsWith("access:deactivate-admin:")) {
+
+            if (role != UserRole.SUPER_ADMIN) {
+                baleBotClient.sendMessage(
+                        adminChatId,
+                        "فقط مدیر اصلی اجازه غیرفعال‌کردن مدیران را دارد."
+                );
+                return;
+            }
+
+            String targetChatId =
+                    callbackData.substring("access:deactivate-admin:".length());
+
+            deactivateAdmin(adminChatId, targetChatId);
+            return;
+        }
+
         // تأیید درخواست
         if (callbackData.startsWith("access:approve:")) {
 
-            String targetChatId = callbackData.substring("access:approve:".length());
+            String targetChatId =
+                    callbackData.substring("access:approve:".length());
 
             updateAccessRequest(
                     adminChatId,
@@ -371,7 +430,8 @@ public class SellerUpdateService {
         // رد درخواست
         if (callbackData.startsWith("access:reject:")) {
 
-            String targetChatId = callbackData.substring("access:reject:".length());
+            String targetChatId =
+                    callbackData.substring("access:reject:".length());
 
             updateAccessRequest(
                     adminChatId,
@@ -380,6 +440,7 @@ public class SellerUpdateService {
             );
         }
     }
+
 
     private void updateAccessRequest(
             String adminChatId,
@@ -624,4 +685,149 @@ public class SellerUpdateService {
 
         sellerAdminMenuService.showUsers(adminChatId);
     }
+
+
+
+
+    private void demoteAdmin(String adminChatId, String targetChatId) {
+
+        var adminOptional = userAccessService.findByChatId(adminChatId);
+
+        if (adminOptional.isEmpty()
+                || adminOptional.get().status() != UserStatus.APPROVED
+                || adminOptional.get().role() != UserRole.SUPER_ADMIN) {
+
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "فقط مدیر اصلی اجازه تغییر نقش مدیران را دارد."
+            );
+            return;
+        }
+
+        // جلوگیری از تغییر حساب خود مدیر اصلی
+        if (adminChatId.equals(targetChatId)) {
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "امکان تغییر نقش حساب مدیر اصلی وجود ندارد."
+            );
+            return;
+        }
+
+        var targetOptional = userAccessService.findByChatId(targetChatId);
+
+        if (targetOptional.isEmpty()) {
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "کاربر موردنظر پیدا نشد."
+            );
+            return;
+        }
+
+        var target = targetOptional.get();
+
+        // فقط مدیر تأییدشده قابلیت تنزل دارد
+        if (target.role() != UserRole.ADMIN
+                || target.status() != UserStatus.APPROVED) {
+
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "فقط مدیران فعال را می‌توانید به فروشنده تنزل دهید."
+            );
+            return;
+        }
+
+        userAccessService.updateRole(targetChatId, UserRole.SELLER);
+
+        baleBotClient.sendMessage(
+                targetChatId,
+                """
+                        📢 نقش کاربری شما تغییر کرد.
+    
+                        نقش جدید شما: فروشنده
+    
+                        برای ورود به پنل فروشنده، دستور /start را ارسال کنید.
+                        """
+        );
+
+        baleBotClient.sendMessage(
+                adminChatId,
+                "نقش مدیر «" + target.name()
+                        + "» با موفقیت به فروشنده تغییر کرد."
+        );
+
+        sellerAdminMenuService.showUsers(adminChatId);
+    }
+
+
+    private void deactivateAdmin(String adminChatId, String targetChatId) {
+
+        var adminOptional = userAccessService.findByChatId(adminChatId);
+
+        if (adminOptional.isEmpty()
+                || adminOptional.get().status() != UserStatus.APPROVED
+                || adminOptional.get().role() != UserRole.SUPER_ADMIN) {
+
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "فقط مدیر اصلی اجازه غیرفعال‌کردن مدیران را دارد."
+            );
+            return;
+        }
+
+        // جلوگیری از غیرفعال‌کردن حساب خود مدیر اصلی
+        if (adminChatId.equals(targetChatId)) {
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "امکان غیرفعال‌کردن حساب مدیر اصلی وجود ندارد."
+            );
+            return;
+        }
+
+        var targetOptional = userAccessService.findByChatId(targetChatId);
+
+        if (targetOptional.isEmpty()) {
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "کاربر موردنظر پیدا نشد."
+            );
+            return;
+        }
+
+        var target = targetOptional.get();
+
+        // فقط مدیر تأییدشده قابلیت غیرفعال‌شدن دارد
+        if (target.role() != UserRole.ADMIN
+                || target.status() != UserStatus.APPROVED) {
+
+            baleBotClient.sendMessage(
+                    adminChatId,
+                    "فقط مدیران فعال را می‌توانید غیرفعال کنید."
+            );
+            return;
+        }
+
+        userAccessService.updateStatus(
+                targetChatId,
+                UserStatus.REJECTED
+        );
+
+        baleBotClient.sendMessage(
+                targetChatId,
+                """
+                        🔴 دسترسی شما به پنل مدیریت ابزارمارکت غیرفعال شد.
+    
+                        برای پیگیری با مدیر اصلی ابزارمارکت تماس بگیرید.
+                        """
+        );
+
+        baleBotClient.sendMessage(
+                adminChatId,
+                "دسترسی مدیر «" + target.name()
+                        + "» با موفقیت غیرفعال شد."
+        );
+
+        sellerAdminMenuService.showUsers(adminChatId);
+    }
+
+
 }

@@ -3,13 +3,19 @@ package ir.toolsmarket.tools_market_bot.customer.menu;
 import ir.toolsmarket.tools_market_bot.model.Product;
 import ir.toolsmarket.tools_market_bot.model.ProductCategory;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class BotMenuService {
+
+    private static final Logger log = LoggerFactory.getLogger(BotMenuService.class);
 
     private final BaleBotClient baleBotClient;
 
@@ -29,10 +35,10 @@ public class BotMenuService {
         sendMessage(
                 chatId,
                 """
-                به ابزارمارکت خوش آمدید 🔧
-
-                لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
-                """,
+                        به ابزارمارکت خوش آمدید 🔧
+                        
+                        لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
+                        """,
                 keyboard
         );
     }
@@ -53,10 +59,10 @@ public class BotMenuService {
         sendMessage(
                 chatId,
                 """
-                🛒 دسته‌بندی محصولات
-
-                لطفاً دسته‌بندی موردنظر خود را انتخاب کنید:
-                """,
+                        🛒 دسته‌بندی محصولات
+                        
+                        لطفاً دسته‌بندی موردنظر خود را انتخاب کنید:
+                        """,
                 keyboard
         );
     }
@@ -112,17 +118,17 @@ public class BotMenuService {
         baleBotClient.sendMessage(
                 chatId,
                 """
-                📦 ثبت سفارش
-
-                لطفاً اطلاعات زیر را ارسال کنید:
-
-                ۱. نام و نام خانوادگی
-                ۲. شماره تماس
-                ۳. نام محصول
-                ۴. تعداد موردنیاز
-
-                فروشنده برای هماهنگی با شما تماس خواهد گرفت.
-                """
+                        📦 ثبت سفارش
+                        
+                        لطفاً اطلاعات زیر را ارسال کنید:
+                        
+                        ۱. نام و نام خانوادگی
+                        ۲. شماره تماس
+                        ۳. نام محصول
+                        ۴. تعداد موردنیاز
+                        
+                        فروشنده برای هماهنگی با شما تماس خواهد گرفت.
+                        """
         );
     }
 
@@ -132,11 +138,11 @@ public class BotMenuService {
         baleBotClient.sendMessage(
                 chatId,
                 """
-                📞 ارتباط با فروشنده
-
-                برای استعلام قیمت و دریافت راهنمایی،
-                درخواست خود را ارسال کنید.
-                """
+                        📞 ارتباط با فروشنده
+                        
+                        برای استعلام قیمت و دریافت راهنمایی،
+                        درخواست خود را ارسال کنید.
+                        """
         );
     }
 
@@ -156,7 +162,11 @@ public class BotMenuService {
     }
 
     // نمایش جزئیات یک محصول
+
+
     public void showProductDetail(String chatId, Product product) {
+
+        long totalStart = System.currentTimeMillis();
 
         List<List<Map<String, Object>>> inlineKeyboard = List.of(
                 List.of(
@@ -178,47 +188,94 @@ public class BotMenuService {
         );
 
         String caption = """
-            🔧 %s
-
-            %s
-
-            💰 قیمت: %s
-            """.formatted(
+                🔧 %s
+                
+                %s
+                
+                💰 قیمت: %s
+                """.formatted(
                 product.name(),
                 product.description(),
                 product.priceLabel()
         );
 
-        // مسیر عکس از resources خوانده می‌شود
-        org.springframework.core.io.ClassPathResource image =
-                new org.springframework.core.io.ClassPathResource(product.imagePath());
+        var image = new org.springframework.core.io.ClassPathResource(
+                product.imagePath()
+        );
 
         try {
             if (image.exists()) {
-                // عکس همراه توضیحات و دکمه‌ها ارسال می‌شود
+
+                // اندازه‌گیری زمان خواندن عکس
+                long readStart = System.currentTimeMillis();
+
+                byte[] photoBytes = image.getInputStream().readAllBytes();
+
+                long readTime = System.currentTimeMillis() - readStart;
+
+                log.info(
+                        "خواندن عکس محصول {} در {} میلی‌ثانیه انجام شد. حجم: {} بایت",
+                        product.name(),
+                        readTime,
+                        photoBytes.length
+                );
+
+                // اندازه‌گیری زمان ارسال عکس به بله
+                long sendStart = System.currentTimeMillis();
+
                 baleBotClient.sendPhoto(
                         chatId,
-                        image.getInputStream().readAllBytes(),
+                        photoBytes,
                         image.getFilename(),
                         caption,
                         replyMarkup
                 );
-            } else {
-                // اگر عکس موجود نبود، جزئیات متنی ارسال می‌شود
-                baleBotClient.sendMessage(
-                        chatId,
-                        caption,
-                        replyMarkup
+
+                long sendTime = System.currentTimeMillis() - sendStart;
+
+                log.info(
+                        "ارسال عکس محصول {} به بله {} میلی‌ثانیه طول کشید",
+                        product.name(),
+                        sendTime
                 );
+
+                /*long sendStart = System.currentTimeMillis();
+
+                baleBotClient.sendMessage(chatId, caption, replyMarkup);
+
+                log.info(
+                        "ارسال پیام متنی به بله {} میلی‌ثانیه طول کشید",
+                        System.currentTimeMillis() - sendStart
+                );
+*/
+            } else {
+                log.warn(
+                        "عکس محصول {} پیدا نشد: {}",
+                        product.name(),
+                        product.imagePath()
+                );
+
+                baleBotClient.sendMessage(chatId, caption, replyMarkup);
             }
-        } catch (java.io.IOException exception) {
-            baleBotClient.sendMessage(
-                    chatId,
-                    caption,
-                    replyMarkup
+
+        } catch (Exception exception) {
+
+            log.error(
+                    "خطا در نمایش جزئیات محصول {}",
+                    product.name(),
+                    exception
             );
+
+            baleBotClient.sendMessage(chatId, caption, replyMarkup);
         }
+
+        log.info(
+                "مجموع زمان نمایش جزئیات محصول {} برابر {} میلی‌ثانیه",
+                product.name(),
+                System.currentTimeMillis() - totalStart
+        );
     }
+
 
     // نمایش راهنمای سفارش برای یک محصول مشخص
     public void showOrderGuide(String chatId, Product product) {
@@ -226,18 +283,18 @@ public class BotMenuService {
         baleBotClient.sendMessage(
                 chatId,
                 """
-                📦 ثبت سفارش
-    
-                محصول انتخاب‌شده: %s
-    
-                لطفاً اطلاعات زیر را ارسال کنید:
-    
-                ۱. نام و نام خانوادگی
-                ۲. شماره تماس
-                ۳. تعداد موردنیاز
-    
-                فروشنده برای هماهنگی با شما تماس خواهد گرفت.
-                """.formatted(product.name())
+                        📦 ثبت سفارش
+                        
+                        محصول انتخاب‌شده: %s
+                        
+                        لطفاً اطلاعات زیر را ارسال کنید:
+                        
+                        ۱. نام و نام خانوادگی
+                        ۲. شماره تماس
+                        ۳. تعداد موردنیاز
+                        
+                        فروشنده برای هماهنگی با شما تماس خواهد گرفت.
+                        """.formatted(product.name())
         );
     }
 

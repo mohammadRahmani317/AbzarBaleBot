@@ -172,21 +172,37 @@ public class SellerAdminMenuService {
     }
 
     // نمایش فهرست تمام کاربران
+
     public void showUsers(String chatId) {
 
-        var users = userAccessService.findAll();
+        var currentUser = userAccessService.findByChatId(chatId);
 
-        if (users.isEmpty()) {
-            baleBotClient.sendMessage(
-                    chatId,
-                    "هنوز هیچ کاربری ثبت نشده است."
-            );
+        if (currentUser.isEmpty()
+                || currentUser.get().status() != UserStatus.APPROVED
+                || (currentUser.get().role() != UserRole.SUPER_ADMIN
+                && currentUser.get().role() != UserRole.ADMIN)) {
+
+            baleBotClient.sendMessage(chatId, "شما اجازه مدیریت کاربران را ندارید.");
             return;
         }
 
-        StringBuilder message = new StringBuilder(
-                "👥 مدیریت کاربران\n\n"
-        );
+        boolean isSuperAdmin = currentUser.get().role() == UserRole.SUPER_ADMIN;
+
+        var users = userAccessService.findAll();
+
+        // مدیر عادی فقط فروشنده‌ها را مشاهده می‌کند
+        if (!isSuperAdmin) {
+            users = users.stream()
+                    .filter(user -> user.role() == UserRole.SELLER)
+                    .toList();
+        }
+
+        if (users.isEmpty()) {
+            baleBotClient.sendMessage(chatId, "هنوز هیچ کاربری ثبت نشده است.");
+            return;
+        }
+
+        StringBuilder message = new StringBuilder("👥 مدیریت کاربران\n\n");
 
         List<List<Map<String, Object>>> keyboard = new java.util.ArrayList<>();
 
@@ -205,9 +221,13 @@ public class SellerAdminMenuService {
                     .append(user.chatId())
                     .append("\n\n");
 
-            // فقط برای کاربران ردشده امکان بررسی مجدد نمایش داده شود
-            if (user.status() == UserStatus.REJECTED) {
+            // مدیر اصلی نمی‌تواند حساب خودش را تغییر دهد
+            if (user.chatId().equals(chatId)) {
+                continue;
+            }
 
+            // بررسی مجدد کاربران ردشده فقط توسط مدیر اصلی
+            if (isSuperAdmin && user.status() == UserStatus.REJECTED) {
                 keyboard.add(List.of(
                         Map.of(
                                 "text", "🔄 بررسی مجدد " + user.name(),
@@ -216,23 +236,45 @@ public class SellerAdminMenuService {
                 ));
             }
 
-            // عملیات قابل انجام روی فروشنده تأییدشده
+            // عملیات روی فروشنده تأییدشده
             if (user.status() == UserStatus.APPROVED
                     && user.role() == UserRole.SELLER) {
 
-                // ارتقای فروشنده به مدیر
-                keyboard.add(List.of(
-                        Map.of(
-                                "text", "⬆️ ارتقا به مدیر " + user.name(),
-                                "callback_data", "access:promote:" + user.chatId()
-                        )
-                ));
+                // ارتقا فقط توسط مدیر اصلی
+                if (isSuperAdmin) {
+                    keyboard.add(List.of(
+                            Map.of(
+                                    "text", "⬆️ ارتقا به مدیر " + user.name(),
+                                    "callback_data", "access:promote:" + user.chatId()
+                            )
+                    ));
+                }
 
-                // غیرفعال‌کردن فروشنده
+                // غیرفعال‌سازی فروشنده توسط مدیر یا مدیر اصلی
                 keyboard.add(List.of(
                         Map.of(
                                 "text", "🔴 غیرفعال‌کردن " + user.name(),
                                 "callback_data", "access:deactivate:" + user.chatId()
+                        )
+                ));
+            }
+
+            // عملیات روی مدیر تأییدشده فقط توسط مدیر اصلی
+            if (isSuperAdmin
+                    && user.status() == UserStatus.APPROVED
+                    && user.role() == UserRole.ADMIN) {
+
+                keyboard.add(List.of(
+                        Map.of(
+                                "text", "⬇️ تنزل به فروشنده " + user.name(),
+                                "callback_data", "access:demote:" + user.chatId()
+                        )
+                ));
+
+                keyboard.add(List.of(
+                        Map.of(
+                                "text", "🔴 غیرفعال‌کردن مدیر " + user.name(),
+                                "callback_data", "access:deactivate-admin:" + user.chatId()
                         )
                 ));
             }
@@ -249,6 +291,7 @@ public class SellerAdminMenuService {
                 Map.of("inline_keyboard", keyboard)
         );
     }
+
 
     // تبدیل وضعیت فنی به عنوان فارسی
     private String getStatusTitle(UserStatus status) {

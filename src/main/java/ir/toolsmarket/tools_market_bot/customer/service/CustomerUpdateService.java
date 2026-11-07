@@ -130,109 +130,6 @@ public class CustomerUpdateService {
         );
     }
 
-   /* private void processUpdate(JsonNode update) {
-
-        // اول بررسی می‌کنیم که آپدیت مربوط به کلیک روی Inline Keyboard است یا نه
-        JsonNode callbackQuery = update.path("callback_query");
-
-        if (!callbackQuery.isMissingNode()) {
-            processCallbackQuery(callbackQuery);
-            return;
-        }
-
-        JsonNode message = update.path("message");
-
-        if (!message.isMissingNode()) {
-            String chatId = message.path("chat")
-                    .path("id")
-                    .asText();
-
-            String text = message.path("text").asText("");
-
-            log.info("Received message from chatId: {}", chatId);
-
-            // ادامه پردازش پیام فعلی
-        }
-
-        String chatId = message.path("chat")
-                .path("id").asText();
-
-        String text = message.path("text").asText("").trim();
-
-        if (orderSessionService.getOrder(chatId) != null) {
-            processOrderMessage(chatId, text);
-            return;
-        }
-
-        if (chatId.isBlank() || text.isBlank()) {
-            return;
-        }
-
-        log.info("پیام دریافتی از کاربر {}: {}", chatId, text);
-
-        if ("/start".equals(text)) {
-            botMenuService.showMainMenu(chatId);
-            return;
-        }
-
-        OrderState orderState = orderSessionService.getOrder(chatId);
-
-        if (orderState != null && orderState.getQuantity() == null) {
-
-            try {
-                int quantity = Integer.parseInt(text);
-
-                if (quantity <= 0) {
-                    baleBotClient.sendMessage(
-                            chatId,
-                            "تعداد باید عددی بزرگ‌تر از صفر باشد. لطفاً دوباره وارد کنید."
-                    );
-                    return;
-                }
-
-                orderState.setQuantity(quantity);
-
-                baleBotClient.sendMessage(
-                        chatId,
-                        """
-                                تعداد موردنیاز: %d
-                                
-                                مرحله بعدی ثبت سفارش را به‌زودی تکمیل می‌کنیم.
-                                """.formatted(quantity)
-                );
-
-            } catch (NumberFormatException exception) {
-                baleBotClient.sendMessage(
-                        chatId,
-                        "لطفاً تعداد را فقط به‌صورت عدد وارد کنید."
-                );
-            }
-
-            return;
-        }
-
-        BotMenuOption menuOption =
-                BotMenuOption.fromTitle(text).orElse(null);
-
-        if (menuOption != null) {
-            handleMenuOption(chatId, menuOption);
-            return;
-        }
-
-        ProductCategory category =
-                ProductCategory.fromTitle(text).orElse(null);
-
-        if (category != null) {
-            showProducts(chatId, category);
-            return;
-        }
-
-        baleBotClient.sendMessage(
-                chatId,
-                "لطفاً یکی از گزینه‌های منو را انتخاب کنید."
-        );
-    }
-*/
     private void handleMenuOption(String chatId, BotMenuOption option) {
 
         switch (option) {
@@ -280,11 +177,18 @@ public class CustomerUpdateService {
         }
 
         // متوقف کردن حالت انتظار دکمه در بله
+
         try {
             baleBotClient.answerCallbackQuery(callbackQueryId);
         } catch (Exception exception) {
-            log.warn("پاسخ به Callback Query ناموفق بود: {}", callbackQueryId);
+            log.warn(
+                    "پاسخ به Callback Query ناموفق بود. callbackQueryId: {}، علت: {}",
+                    callbackQueryId,
+                    exception.getMessage(),
+                    exception
+            );
         }
+
 
         log.info("Callback دریافتی از کاربر {}: {}", chatId, callbackData);
 

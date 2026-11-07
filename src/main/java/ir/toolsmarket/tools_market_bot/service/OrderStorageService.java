@@ -1,3 +1,4 @@
+
 package ir.toolsmarket.tools_market_bot.service;
 
 import ir.toolsmarket.tools_market_bot.model.Order;
@@ -16,27 +17,31 @@ public class OrderStorageService {
 
     private final ObjectMapper objectMapper;
 
-    // فایل ذخیره سفارش‌ها در پوشه data پروژه
+    // فایل ذخیره سفارش‌ها
     private final Path filePath = Path.of("data", "orders.json");
 
     public OrderStorageService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    // ذخیره سفارش جدید در کنار سفارش‌های قبلی
+    // ذخیره سفارش جدید
     public synchronized void save(Order order) throws IOException {
 
         Files.createDirectories(filePath.getParent());
 
         List<Order> orders = readOrders();
-
         orders.add(order);
 
         objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValue(filePath.toFile(), orders);
     }
 
-    // خواندن سفارش‌های قبلی
+    // دریافت تمام سفارش‌ها
+    public synchronized List<Order> findAll() throws IOException {
+        return readOrders();
+    }
+
+    // خواندن سفارش‌های ذخیره‌شده
     private List<Order> readOrders() throws IOException {
 
         if (Files.notExists(filePath)) {
