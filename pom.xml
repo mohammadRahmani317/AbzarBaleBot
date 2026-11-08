@@ -53,6 +53,13 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- تبدیل تاریخ میلادی به شمسی -->
+		<dependency>
+			<groupId>com.ibm.icu</groupId>
+			<artifactId>icu4j</artifactId>
+			<version>77.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

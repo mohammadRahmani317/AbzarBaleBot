@@ -3,6 +3,10 @@ package ir.toolsmarket.tools_market_bot.customer.menu;
 import ir.toolsmarket.tools_market_bot.model.Product;
 import ir.toolsmarket.tools_market_bot.model.ProductCategory;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
+import ir.toolsmarket.tools_market_bot.service.ProductPriceService;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
@@ -18,9 +22,11 @@ public class BotMenuService {
     private static final Logger log = LoggerFactory.getLogger(BotMenuService.class);
 
     private final BaleBotClient baleBotClient;
+    private final ProductPriceService productPriceService;
 
-    public BotMenuService(BaleBotClient baleBotClient) {
+    public BotMenuService(BaleBotClient baleBotClient, ProductPriceService productPriceService) {
         this.baleBotClient = baleBotClient;
+        this.productPriceService = productPriceService;
     }
 
     // نمایش منوی اصلی
@@ -196,7 +202,9 @@ public class BotMenuService {
                 """.formatted(
                 product.name(),
                 product.description(),
-                product.priceLabel()
+                productPriceService.findCurrentPrice(product.id())
+                        .map(BotMenuService::formatPrice)
+                        .orElse("استعلام قیمت")
         );
 
         var image = new org.springframework.core.io.ClassPathResource(
@@ -326,4 +334,9 @@ public class BotMenuService {
                 replyMarkup
         );
     }
+    private static String formatPrice(BigDecimal price) {
+        return NumberFormat.getNumberInstance(Locale.forLanguageTag("fa-IR"))
+                .format(price) + " تومان";
+    }
+
 }

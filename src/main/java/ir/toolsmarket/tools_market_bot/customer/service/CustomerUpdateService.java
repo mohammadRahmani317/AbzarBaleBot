@@ -6,6 +6,7 @@ import ir.toolsmarket.tools_market_bot.model.*;
 import ir.toolsmarket.tools_market_bot.service.OrderSessionService;
 import ir.toolsmarket.tools_market_bot.service.OrderStorageService;
 import ir.toolsmarket.tools_market_bot.service.ProductCatalogService;
+import ir.toolsmarket.tools_market_bot.service.ProductPriceService;
 import ir.toolsmarket.tools_market_bot.customer.menu.BotMenuService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ public class CustomerUpdateService {
     private final BotMenuService botMenuService;
     private final OrderSessionService orderSessionService;
     private final OrderStorageService orderStorageService;
+    private final ProductPriceService productPriceService;
 
     private long nextUpdateId = 0;
 
@@ -36,13 +38,15 @@ public class CustomerUpdateService {
             ProductCatalogService productCatalogService,
             BotMenuService botMenuService,
             OrderSessionService orderSessionService,
-            OrderStorageService orderStorageService
+            OrderStorageService orderStorageService,
+            ProductPriceService productPriceService
     ) {
         this.baleBotClient = baleBotClient;
         this.productCatalogService = productCatalogService;
         this.botMenuService = botMenuService;
         this.orderSessionService = orderSessionService;
         this.orderStorageService = orderStorageService;
+        this.productPriceService = productPriceService;
     }
 
     @Scheduled(fixedDelay = 1000)
@@ -227,7 +231,8 @@ public class CustomerUpdateService {
                     orderState.getQuantity(),
                     orderState.getCustomerName(),
                     orderState.getPhoneNumber(),
-                    java.time.Instant.now()
+                    java.time.Instant.now(),
+                    productPriceService.findCurrentPrice(product.id()).orElse(null)
             );
 
             try {

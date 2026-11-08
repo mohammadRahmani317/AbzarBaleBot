@@ -1,0 +1,39 @@
+{
+  "prices" : {
+    "2" : 1400000,
+    "1" : 400000
+  },
+  "history" : [ {
+    "id" : "dfe736ca-65e7-4b21-9387-79bd7eb51d6f",
+    "productId" : 1,
+    "previousPrice" : null,
+    "newPrice" : 300000,
+    "changedByChatId" : "637922540",
+    "changedByName" : "خدیجه",
+    "changedAt" : "2026-11-09T00:59:13.8621309"
+  }, {
+    "id" : "58aa169d-c888-4018-8f76-2a02fa509b1f",
+    "productId" : 1,
+    "previousPrice" : 300000,
+    "newPrice" : 400000,
+    "changedByChatId" : "637922540",
+    "changedByName" : "خدیجه",
+    "changedAt" : "2026-11-09T00:59:27.3140602"
+  }, {
+    "id" : "7b5ed928-7b25-496c-9852-f0f7d21ec74f",
+    "productId" : 2,
+    "previousPrice" : null,
+    "newPrice" : 1200000,
+    "changedByChatId" : "637922540",
+    "changedByName" : "خدیجه",
+    "changedAt" : "2026-11-09T00:59:37.8221817"
+  }, {
+    "id" : "68e5b2c4-5153-4e09-a05a-eb3f97d5530e",
+    "productId" : 2,
+    "previousPrice" : 1200000,
+    "newPrice" : 1400000,
+    "changedByChatId" : "637922540",
+    "changedByName" : "خدیجه",
+    "changedAt" : "2026-11-09T00:59:47.1947971"
+  } ]
+}

@@ -7,6 +7,11 @@ import ir.toolsmarket.tools_market_bot.model.UserRole;
 import ir.toolsmarket.tools_market_bot.model.UserStatus;
 import ir.toolsmarket.tools_market_bot.seller.menu.SellerAdminMenuService;
 import ir.toolsmarket.tools_market_bot.seller.menu.SellerMenuService;
+import ir.toolsmarket.tools_market_bot.seller.menu.PriceManagementMenuService;
+import ir.toolsmarket.tools_market_bot.model.UserPermission;
+import java.math.BigDecimal;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import ir.toolsmarket.tools_market_bot.service.UserAccessService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +30,8 @@ public class SellerUpdateService {
     private final UserAccessService userAccessService;
     private final BaleBotProperties properties;
     private final SellerAdminMenuService sellerAdminMenuService;
+    private final PriceManagementMenuService priceManagementMenuService;
+    private final Map<String, Integer> awaitingPriceInput = new ConcurrentHashMap<>();
 
     private long nextUpdateId = 0;
 
@@ -33,13 +40,15 @@ public class SellerUpdateService {
             SellerMenuService sellerMenuService,
             UserAccessService userAccessService,
             BaleBotProperties properties,
-            SellerAdminMenuService sellerAdminMenuService
+            SellerAdminMenuService sellerAdminMenuService,
+            PriceManagementMenuService priceManagementMenuService
     ) {
         this.baleBotClient = baleBotClient;
         this.sellerMenuService = sellerMenuService;
         this.userAccessService = userAccessService;
         this.properties = properties;
         this.sellerAdminMenuService = sellerAdminMenuService;
+        this.priceManagementMenuService = priceManagementMenuService;
     }
 
     @Scheduled(fixedDelay = 1000)
@@ -95,6 +104,36 @@ public class SellerUpdateService {
         }
 
         log.info("پیام دریافتی از فروشنده {}: {}", chatId, text);
+
+        Integer pendingProductId = awaitingPriceInput.get(chatId);
+        if (pendingProductId != null) {
+            if ("لغو".equals(text)) {
+                awaitingPriceInput.remove(chatId);
+                baleBotClient.sendMessage(chatId, "عملیات تغییر قیمت لغو شد.");
+                return;
+            }
+            try {
+                BigDecimal price = parseTomanPrice(text);
+                if (price.signum() <= 0 || price.stripTrailingZeros().scale() > 0) {
+                    throw new NumberFormatException();
+                }
+                awaitingPriceInput.remove(chatId);
+                priceManagementMenuService.savePrice(chatId, pendingProductId, price);
+            } catch (NumberFormatException exception) {
+                baleBotClient.sendMessage(chatId, "قیمت معتبر نیست. مبلغ را به تومان و به‌صورت عدد صحیح وارد کنید؛ مثال: ۲۵۰۰۰۰۰");
+            }
+            return;
+        }
+
+        if ("💰 مدیریت قیمت محصولات".equals(text)) {
+            priceManagementMenuService.showProductsForUpdate(chatId);
+            return;
+        }
+
+        if ("📊 تاریخچه قیمت محصولات".equals(text)) {
+            priceManagementMenuService.showProductsForHistory(chatId);
+            return;
+        }
 
         // شروع بات
         if ("/start".equals(text)) {
@@ -296,6 +335,40 @@ public class SellerUpdateService {
             log.warn("پاسخ به درخواست دکمه بله ناموفق بود: {}", e.getMessage());
         }
 
+        // عملیات قیمت‌گذاری دسترسی مستقل از نقش مدیر دارد
+        if (callbackData.startsWith("price:edit:")) {
+            String productIdText = callbackData.substring("price:edit:".length());
+            try {
+                Integer productId = Integer.parseInt(productIdText);
+                if (priceManagementMenuService.requestPriceUpdate(adminChatId, productId)) {
+                    awaitingPriceInput.put(adminChatId, productId);
+                }
+            } catch (NumberFormatException exception) {
+                baleBotClient.sendMessage(adminChatId, "شناسه محصول نامعتبر است.");
+            }
+            return;
+        }
+
+        if ("price:history:list".equals(callbackData)) {
+            priceManagementMenuService.showProductsForHistory(adminChatId);
+            return;
+        }
+
+        if (callbackData.startsWith("price:history:")) {
+            String productIdText = callbackData.substring("price:history:".length());
+            try {
+                priceManagementMenuService.showHistory(adminChatId, Integer.parseInt(productIdText));
+            } catch (NumberFormatException exception) {
+                baleBotClient.sendMessage(adminChatId, "شناسه محصول نامعتبر است.");
+            }
+            return;
+        }
+
+        if ("price:menu".equals(callbackData)) {
+            showUserMenu(adminChatId);
+            return;
+        }
+
         // بررسی دسترسی مدیر
         var adminOptional = userAccessService.findByChatId(adminChatId);
 
@@ -308,6 +381,32 @@ public class SellerUpdateService {
 
         if (role != UserRole.SUPER_ADMIN
                 && role != UserRole.ADMIN) {
+            return;
+        }
+
+        if (callbackData.startsWith("access:price-grant:")
+                || callbackData.startsWith("access:price-revoke:")) {
+            if (role != UserRole.SUPER_ADMIN) {
+                baleBotClient.sendMessage(adminChatId, "فقط مدیر اصلی اجازه تغییر مجوز قیمت‌گذاری را دارد.");
+                return;
+            }
+            boolean enabled = callbackData.startsWith("access:price-grant:");
+            String prefix = enabled ? "access:price-grant:" : "access:price-revoke:";
+            String targetChatId = callbackData.substring(prefix.length());
+            var target = userAccessService.findByChatId(targetChatId).orElse(null);
+            if (target == null || target.role() != UserRole.SELLER
+                    || target.status() != UserStatus.APPROVED) {
+                baleBotClient.sendMessage(adminChatId, "مجوز قیمت‌گذاری فقط برای فروشنده تأییدشده قابل تغییر است.");
+                return;
+            }
+            userAccessService.setPermission(targetChatId, UserPermission.PRICE_MANAGER, enabled);
+            baleBotClient.sendMessage(targetChatId, enabled
+                    ? "💰 مجوز مدیریت قیمت محصولات برای شما فعال شد."
+                    : "🔒 مجوز مدیریت قیمت محصولات از حساب شما برداشته شد.");
+            baleBotClient.sendMessage(adminChatId, enabled
+                    ? "مجوز قیمت‌گذاری برای «" + target.name() + "» فعال شد."
+                    : "مجوز قیمت‌گذاری برای «" + target.name() + "» لغو شد.");
+            sellerAdminMenuService.showUsers(adminChatId);
             return;
         }
 
@@ -829,5 +928,25 @@ public class SellerUpdateService {
         sellerAdminMenuService.showUsers(adminChatId);
     }
 
+
+    private BigDecimal parseTomanPrice(String rawValue) {
+        String normalized = rawValue
+                .replace("٬", "")
+                .replace(",", "")
+                .replace("،", "")
+                .replace(" ", "")
+                .replace("۰", "0").replace("۱", "1").replace("۲", "2")
+                .replace("۳", "3").replace("۴", "4").replace("۵", "5")
+                .replace("۶", "6").replace("۷", "7").replace("۸", "8")
+                .replace("۹", "9")
+                .replace("٠", "0").replace("١", "1").replace("٢", "2")
+                .replace("٣", "3").replace("٤", "4").replace("٥", "5")
+                .replace("٦", "6").replace("٧", "7").replace("٨", "8")
+                .replace("٩", "9");
+        if (!normalized.matches("\\d+")) {
+            throw new NumberFormatException("قیمت باید عدد صحیح باشد");
+        }
+        return new BigDecimal(normalized);
+    }
 
 }

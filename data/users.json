@@ -2,10 +2,12 @@
   "chatId" : "1972662390",
   "name" : "مدیر اصلی",
   "role" : "SUPER_ADMIN",
-  "status" : "APPROVED"
+  "status" : "APPROVED",
+  "permissions" : [ "VIEW_PRICE_HISTORY" ]
 }, {
   "chatId" : "637922540",
   "name" : "خدیجه",
   "role" : "SELLER",
-  "status" : "APPROVED"
+  "status" : "APPROVED",
+  "permissions" : [ "PRICE_MANAGER" ]
 } ]

@@ -10,3 +10,5 @@ tools-market:
     token: "1157674478:m-FBQhDQzQZBWlQ9u-ZhqJQRLeHSkooNgfE"
     seller-token: "1753038435:eNZJvMbXhzsNo3O6-VXcPs0QuoMR_dkbgdU"
     super-admin-chat-id: "1972662390"
+  storage:
+    product-prices-file: data/product-prices.json

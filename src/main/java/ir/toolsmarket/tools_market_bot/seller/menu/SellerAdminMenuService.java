@@ -3,6 +3,7 @@ package ir.toolsmarket.tools_market_bot.seller.menu;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.model.UserRole;
 import ir.toolsmarket.tools_market_bot.model.UserStatus;
+import ir.toolsmarket.tools_market_bot.model.UserPermission;
 import ir.toolsmarket.tools_market_bot.service.UserAccessService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -37,18 +38,15 @@ public class SellerAdminMenuService {
                 لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
                 """.formatted(pendingCount);
 
+        List<List<Map<String, Object>>> keyboard = new java.util.ArrayList<>();
+        keyboard.add(List.of(Map.of("text", "👥 درخواست‌های دسترسی")));
+        keyboard.add(List.of(Map.of("text", "👤 مدیریت کاربران")));
+        keyboard.add(List.of(Map.of("text", "📦 مشاهده سفارش‌ها")));
+        if (userAccessService.hasPermission(chatId, UserPermission.VIEW_PRICE_HISTORY)) {
+            keyboard.add(List.of(Map.of("text", "📊 تاریخچه قیمت محصولات")));
+        }
         Map<String, Object> replyMarkup = Map.of(
-                "keyboard", List.of(
-                        List.of(
-                                Map.of("text", "👥 درخواست‌های دسترسی")
-                        ),
-                        List.of(
-                                Map.of("text", "👤 مدیریت کاربران")
-                        ),
-                        List.of(
-                                Map.of("text", "📦 مشاهده سفارش‌ها")
-                        )
-                ),
+                "keyboard", keyboard,
                 "resize_keyboard", true
         );
 
@@ -250,6 +248,17 @@ public class SellerAdminMenuService {
                     ));
                 }
 
+                // مدیریت مجوز قیمت‌گذاری فقط توسط سوپرادمین
+                if (isSuperAdmin) {
+                    boolean priceManager = user.hasPermission(UserPermission.PRICE_MANAGER);
+                    keyboard.add(List.of(Map.of(
+                            "text", priceManager
+                                    ? "🔒 لغو مجوز قیمت‌گذاری " + user.name()
+                                    : "💰 اعطای مجوز قیمت‌گذاری " + user.name(),
+                            "callback_data", (priceManager ? "access:price-revoke:" : "access:price-grant:") + user.chatId()
+                    )));
+                }
+
                 // غیرفعال‌سازی فروشنده توسط مدیر یا مدیر اصلی
                 keyboard.add(List.of(
                         Map.of(
@@ -257,6 +266,17 @@ public class SellerAdminMenuService {
                                 "callback_data", "access:deactivate:" + user.chatId()
                         )
                 ));
+            }
+
+            // اگر کاربری با مجوز قیمت‌گذاری به مدیر ارتقا یافت، امکان لغو مجوز همچنان وجود دارد
+            if (isSuperAdmin
+                    && user.status() == UserStatus.APPROVED
+                    && user.role() == UserRole.ADMIN
+                    && user.hasPermission(UserPermission.PRICE_MANAGER)) {
+                keyboard.add(List.of(Map.of(
+                        "text", "🔒 لغو مجوز قیمت‌گذاری " + user.name(),
+                        "callback_data", "access:price-revoke:" + user.chatId()
+                )));
             }
 
             // عملیات روی مدیر تأییدشده فقط توسط مدیر اصلی

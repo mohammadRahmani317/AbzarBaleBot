@@ -35,17 +35,39 @@ public class ProductCatalogService {
         }
     }
 
-    // دریافت محصولات یک دسته‌بندی
+    /**
+     * دریافت تمام محصولات
+     * مورد استفاده در مدیریت قیمت محصولات
+     */
+    public List<Product> findAll() {
+        return products;
+    }
+
+    /**
+     * دریافت محصولات یک دسته‌بندی
+     */
     public List<Product> findByCategory(ProductCategory category) {
+
+        if (category == null) {
+            return List.of();
+        }
 
         return products.stream()
                 .filter(product ->
-                        product.categoryCode().equals(category.getCode())
+                        product.categoryCode() != null &&
+                                product.categoryCode().equals(category.getCode())
                 )
                 .toList();
     }
 
+    /**
+     * دریافت محصول بر اساس شناسه
+     */
     public Optional<Product> findById(Integer id) {
+
+        if (id == null) {
+            return Optional.empty();
+        }
 
         return products.stream()
                 .filter(product -> product.id().equals(id))

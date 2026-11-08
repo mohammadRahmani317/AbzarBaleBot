@@ -1,9 +1,11 @@
-
 package ir.toolsmarket.tools_market_bot.service;
 
 import ir.toolsmarket.tools_market_bot.model.User;
 import ir.toolsmarket.tools_market_bot.model.UserRole;
 import ir.toolsmarket.tools_market_bot.model.UserStatus;
+import ir.toolsmarket.tools_market_bot.model.UserPermission;
+import java.util.HashSet;
+import java.util.Set;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -77,7 +79,8 @@ public class UserAccessService {
                         user.chatId(),
                         user.name(),
                         user.role(),
-                        status
+                        status,
+                        user.permissions()
                 ));
 
                 writeUsers(users);
@@ -99,7 +102,8 @@ public class UserAccessService {
                         user.chatId(),
                         user.name(),
                         role,
-                        user.status()
+                        user.status(),
+                        user.permissions()
                 ));
 
                 writeUsers(users);
@@ -154,11 +158,14 @@ public class UserAccessService {
 
             if (user.chatId().equals(chatId)) {
 
+                Set<UserPermission> permissions = new HashSet<>(user.permissions());
+                permissions.add(UserPermission.VIEW_PRICE_HISTORY);
                 users.set(i, new User(
                         user.chatId(),
                         user.name(),
                         UserRole.SUPER_ADMIN,
-                        UserStatus.APPROVED
+                        UserStatus.APPROVED,
+                        permissions
                 ));
 
                 writeUsers(users);
@@ -170,10 +177,48 @@ public class UserAccessService {
                 chatId,
                 "مدیر اصلی",
                 UserRole.SUPER_ADMIN,
-                UserStatus.APPROVED
+                UserStatus.APPROVED,
+                Set.of(UserPermission.VIEW_PRICE_HISTORY)
         ));
 
         writeUsers(users);
+    }
+
+    // بررسی مجوز مستقل از نقش کاربر
+    public synchronized boolean hasPermission(String chatId, UserPermission permission) {
+        return findByChatId(chatId)
+                .filter(user -> user.status() == UserStatus.APPROVED)
+                .map(user -> user.hasPermission(permission))
+                .orElse(false);
+    }
+
+    // اعطا یا لغو یک مجوز؛ کنترل اینکه درخواست‌دهنده سوپرادمین است در لایه سرویس فراخواننده انجام می‌شود
+    public synchronized void setPermission(
+            String chatId,
+            UserPermission permission,
+            boolean enabled
+    ) {
+        List<User> users = readUsers();
+
+        for (int i = 0; i < users.size(); i++) {
+            User user = users.get(i);
+            if (!user.chatId().equals(chatId)) {
+                continue;
+            }
+
+            Set<UserPermission> permissions = new HashSet<>(user.permissions());
+            if (enabled) {
+                permissions.add(permission);
+            } else {
+                permissions.remove(permission);
+            }
+
+            users.set(i, new User(
+                    user.chatId(), user.name(), user.role(), user.status(), permissions
+            ));
+            writeUsers(users);
+            return;
+        }
     }
 
     public synchronized List<User> findAllPending() {
