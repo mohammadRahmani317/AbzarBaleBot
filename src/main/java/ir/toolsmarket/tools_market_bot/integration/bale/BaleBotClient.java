@@ -8,12 +8,21 @@ import java.util.Map;
 public class BaleBotClient {
 
     private final RestClient restClient;
+    private final boolean configured;
 
     public BaleBotClient(String baseUrl, String token) {
+        this.configured = token != null && !token.isBlank();
+        var httpClient = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(10)).build();
+        var factory = new org.springframework.http.client.JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(java.time.Duration.ofSeconds(30));
         this.restClient = RestClient.builder()
+                .requestFactory(factory)
                 .baseUrl(baseUrl + "/bot" + token)
                 .build();
     }
+
+    public boolean configured() { return configured; }
 
     // غیرفعال کردن Webhook قبلی
     public JsonNode deleteWebhook() {

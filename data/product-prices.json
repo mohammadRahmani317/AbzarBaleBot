@@ -1,39 +1,67 @@
 {
   "prices" : {
-    "2" : 1400000,
+    "6" : 300000,
+    "5" : 12000,
+    "4" : 120000,
+    "3" : 123000,
+    "2" : 550000,
     "1" : 400000
   },
   "history" : [ {
-    "id" : "dfe736ca-65e7-4b21-9387-79bd7eb51d6f",
+    "id" : "52c3da15-cc46-4414-a925-f137a6c18bfd",
     "productId" : 1,
+    "previousPrice" : null,
+    "newPrice" : 400000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:41:26.69378521"
+  }, {
+    "id" : "36ec6662-a184-412f-bd0d-ac03b13dc31d",
+    "productId" : 2,
+    "previousPrice" : null,
+    "newPrice" : 500000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:41:34.682139713"
+  }, {
+    "id" : "ee3c6f29-7a93-4496-a9bc-d723abee7fd1",
+    "productId" : 2,
+    "previousPrice" : 500000,
+    "newPrice" : 550000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:41:45.338183986"
+  }, {
+    "id" : "f7601829-85cf-4c1a-a659-5fa2dea5d3f4",
+    "productId" : 3,
+    "previousPrice" : null,
+    "newPrice" : 123000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:41:50.986869757"
+  }, {
+    "id" : "c17e1e06-abaf-4004-9a87-dfbbdcc4215b",
+    "productId" : 4,
+    "previousPrice" : null,
+    "newPrice" : 120000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:41:57.824620849"
+  }, {
+    "id" : "17e8808e-a038-41a6-90b0-b2201814ab3e",
+    "productId" : 5,
+    "previousPrice" : null,
+    "newPrice" : 12000,
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:42:08.122983009"
+  }, {
+    "id" : "0c9c640f-b738-4158-b0e8-4a745520ca08",
+    "productId" : 6,
     "previousPrice" : null,
     "newPrice" : 300000,
-    "changedByChatId" : "637922540",
-    "changedByName" : "خدیجه",
-    "changedAt" : "2026-11-09T00:59:13.8621309"
-  }, {
-    "id" : "58aa169d-c888-4018-8f76-2a02fa509b1f",
-    "productId" : 1,
-    "previousPrice" : 300000,
-    "newPrice" : 400000,
-    "changedByChatId" : "637922540",
-    "changedByName" : "خدیجه",
-    "changedAt" : "2026-11-09T00:59:27.3140602"
-  }, {
-    "id" : "7b5ed928-7b25-496c-9852-f0f7d21ec74f",
-    "productId" : 2,
-    "previousPrice" : null,
-    "newPrice" : 1200000,
-    "changedByChatId" : "637922540",
-    "changedByName" : "خدیجه",
-    "changedAt" : "2026-11-09T00:59:37.8221817"
-  }, {
-    "id" : "68e5b2c4-5153-4e09-a05a-eb3f97d5530e",
-    "productId" : 2,
-    "previousPrice" : 1200000,
-    "newPrice" : 1400000,
-    "changedByChatId" : "637922540",
-    "changedByName" : "خدیجه",
-    "changedAt" : "2026-11-09T00:59:47.1947971"
+    "changedByChatId" : "1972662390",
+    "changedByName" : "مدیر اصلی",
+    "changedAt" : "2026-11-09T16:42:15.889844598"
   } ]
 }

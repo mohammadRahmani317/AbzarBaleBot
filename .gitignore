@@ -32,3 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 token
+
+# Runtime customer/order/inventory snapshots and migration backups
+/data/order-state.json
+/data/*.bak
+/data/*.tmp

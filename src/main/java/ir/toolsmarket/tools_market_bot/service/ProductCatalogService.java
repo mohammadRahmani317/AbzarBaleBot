@@ -22,10 +22,9 @@ public class ProductCatalogService {
             ClassPathResource resource =
                     new ClassPathResource("data/products.json");
 
-            this.products = objectMapper.readValue(
-                    resource.getInputStream(),
-                    new TypeReference<List<Product>>() {}
-            );
+            try (var stream = resource.getInputStream()) {
+                this.products = List.copyOf(objectMapper.readValue(stream, new TypeReference<List<Product>>() {}));
+            }
 
         } catch (IOException exception) {
             throw new IllegalStateException(

@@ -1,120 +1,83 @@
 package ir.toolsmarket.tools_market_bot.seller.menu;
 
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
-import ir.toolsmarket.tools_market_bot.model.Order;
-import ir.toolsmarket.tools_market_bot.service.OrderStorageService;
-import ir.toolsmarket.tools_market_bot.service.UserAccessService;
-import ir.toolsmarket.tools_market_bot.model.UserPermission;
+import ir.toolsmarket.tools_market_bot.model.*;
+import ir.toolsmarket.tools_market_bot.service.*;
+import ir.toolsmarket.tools_market_bot.util.*;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.util.List;
-import java.text.NumberFormat;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
+import static ir.toolsmarket.tools_market_bot.util.OrderMessages.button;
 
 @Service
 public class SellerMenuService {
-
-    private final BaleBotClient baleBotClient;
-    private final OrderStorageService orderStorageService;
-    private final UserAccessService userAccessService;
-
-    public SellerMenuService(
-            @Qualifier("sellerBaleBotClient") BaleBotClient baleBotClient,
-            OrderStorageService orderStorageService,
-            UserAccessService userAccessService
-    ) {
-        this.baleBotClient = baleBotClient;
-        this.orderStorageService = orderStorageService;
-        this.userAccessService = userAccessService;
+    private final BaleBotClient client;
+    private final OrderService orders;
+    private final UserAccessService access;
+    private final OrderReportService reports;
+    public SellerMenuService(@Qualifier("sellerBaleBotClient") BaleBotClient client,
+                            OrderService orders, UserAccessService access, OrderReportService reports) {
+        this.client = client; this.orders = orders; this.access = access; this.reports = reports;
     }
-
-    public void showMainMenu(String chatId) {
-
-        String message = """
-                سلام، به پنل مدیریت ابزارمارکت خوش آمدید.
-
-                لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
-                """;
-
-        List<List<Map<String, Object>>> keyboard = new java.util.ArrayList<>();
-        keyboard.add(List.of(Map.of("text", "📦 مشاهده سفارش‌ها")));
-        if (userAccessService.hasPermission(chatId, UserPermission.PRICE_MANAGER)) {
-            keyboard.add(List.of(Map.of("text", "💰 مدیریت قیمت محصولات")));
-        }
-        Map<String, Object> replyMarkup = Map.of(
-                "keyboard", keyboard,
-                "resize_keyboard", true
-        );
-
-        baleBotClient.sendMessage(chatId, message, replyMarkup);
+    public void showMainMenu(String actor) {
+        access.requireOperator(actor);
+        client.sendMessage(actor, "به پنل ابزارمارکت خوش آمدید.", Map.of("keyboard", List.of(
+                List.of("📦 مشاهده سفارش‌ها"), List.of("💰 مدیریت قیمت محصولات"),
+                List.of("📦 مدیریت موجودی محصولات"), List.of("📊 گزارش سفارش‌ها")), "resize_keyboard", true));
     }
-
-    // نمایش فهرست سفارش‌ها برای فروشنده
-    public void showOrders(String chatId) {
-
-        try {
-
-            List<Order> orders = orderStorageService.findAll();
-
-            if (orders.isEmpty()) {
-                baleBotClient.sendMessage(
-                        chatId,
-                        "📭 هنوز هیچ سفارشی ثبت نشده است."
-                );
-                return;
+    public void showOrders(String actor) {
+        access.requireOperator(actor);
+        OrderMessages.send(client, actor, "📋 مدیریت سفارش‌ها", List.of(
+                List.of(button("📋 سفارش‌های فعال", "orders:list:active")),
+                List.of(button("✅ تحویل‌شده", "orders:list:delivered")),
+                List.of(button("❌ لغوشده", "orders:list:cancelled")),
+                List.of(button("⌛ منقضی‌شده", "orders:list:expired")),
+                List.of(button("📊 همه سفارش‌ها", "orders:list:all"))));
+    }
+    public void showOrderList(String actor, String group) {
+        Set<OrderStatus> statuses = switch (group) {
+            case "active" -> Set.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING);
+            case "delivered" -> Set.of(OrderStatus.DELIVERED);
+            case "cancelled" -> Set.of(OrderStatus.CANCELLED);
+            case "expired" -> Set.of(OrderStatus.EXPIRED);
+            case "all" -> Set.of();
+            default -> throw new IllegalArgumentException("فهرست نامعتبر است.");
+        };
+        List<Order> list = orders.list(actor, statuses);
+        if (list.isEmpty()) { client.sendMessage(actor, "سفارشی در این فهرست نیست."); return; }
+        // Small pages avoid Bale message and keyboard limits for a growing history.
+        for (int from = 0; from < list.size(); from += 15) {
+            List<List<Map<String, Object>>> buttons = new ArrayList<>();
+            for (Order order : list.subList(from, Math.min(from + 15, list.size()))) {
+                buttons.add(List.of(button(order.customerName() + " — " + (order.legacy() ? "قدیمی" : order.status().title())
+                        + " — " + order.orderId(), "orders:view:" + order.orderId())));
             }
-
-            StringBuilder message = new StringBuilder(
-                    "📦 فهرست سفارش‌های ثبت‌شده\n\n"
-            );
-
-            for (Order order : orders) {
-
-                message.append("🧾 شماره سفارش: ")
-                        .append(order.orderId())
-                        .append("\n")
-                        .append("📦 محصول: ")
-                        .append(order.productName())
-                        .append("\n")
-                        .append("🔢 تعداد: ")
-                        .append(order.quantity())
-                        .append("\n")
-                        .append("👤 مشتری: ")
-                        .append(order.customerName())
-                        .append("\n")
-                        .append("📞 تماس: ")
-                        .append(order.phoneNumber())
-                        .append("\n");
-
-                if (order.unitPriceSnapshot() != null) {
-                    message.append("💰 قیمت زمان ثبت سفارش: ")
-                            .append(NumberFormat.getNumberInstance(Locale.forLanguageTag("fa-IR"))
-                                    .format(order.unitPriceSnapshot()))
-                            .append(" تومان\n");
-                }
-
-                message.append("━━━━━━━━━━━━━━")
-                        .append("\n\n");
-            }
-
-            baleBotClient.sendMessage(chatId, message.toString());
-
-        } catch (IOException e) {
-
-            baleBotClient.sendMessage(
-                    chatId,
-                    "در دریافت فهرست سفارش‌ها مشکلی پیش آمد. لطفاً دوباره تلاش کنید."
-            );
+            OrderMessages.send(client, actor, "📋 سفارش‌ها؛ برای جزئیات انتخاب کنید:", buttons);
         }
     }
-
-    public void showHelp(String chatId) {
-        baleBotClient.sendMessage(
-                chatId,
-                "برای مدیریت سفارش‌های مشتریان از گزینه «📦 مشاهده سفارش‌ها» استفاده کنید."
-        );
+    public void showOrder(String actor, String id) {
+        Order order = orders.findForOperator(id, actor);
+        List<List<Map<String, Object>>> buttons = new ArrayList<>();
+        if (!order.legacy() && order.status() == OrderStatus.CONFIRMED)
+            buttons.add(List.of(button("🔧 شروع آماده‌سازی", "orders:prepare:" + id)));
+        if (!order.legacy() && order.status() == OrderStatus.PREPARING
+                && access.canComplete(access.requireOperator(actor), order.handledByChatId()))
+            buttons.add(List.of(button("📦 ثبت تحویل", "orders:deliver:" + id)));
+        buttons.add(List.of(button("📜 تاریخچه وضعیت", "orders:history:" + id)));
+        OrderMessages.send(client, actor, OrderMessages.details(order), buttons);
     }
+    public void showHistory(String actor, String id) {
+        StringBuilder text = new StringBuilder("📜 تاریخچه سفارش " + id + "\n\n");
+        for (var event : orders.history(id, actor)) {
+            text.append(event.description()).append("\n")
+                    .append(event.previousStatus() == null ? "—" : event.previousStatus().title()).append(" ← ")
+                    .append(event.newStatus().title()).append("\nعامل: ").append(event.changedByName())
+                    .append("\n").append(BotFormatting.dateTime(event.changedAt())).append("\n\n");
+        }
+        OrderMessages.send(client, actor, text.toString(), List.of());
+    }
+    public void showReports(String actor) { orders.expireInvoices(); OrderMessages.send(client, actor, reports.report(actor), List.of()); }
+    public void showHelp(String actor) { access.requireOperator(actor); client.sendMessage(actor, "برای مدیریت سفارش‌ها از منو استفاده کنید."); }
+    public void prepare(String actor, String id) { orders.startPreparation(id, actor); showOrder(actor, id); }
+    public void deliver(String actor, String id) { orders.deliver(id, actor); showOrder(actor, id); }
 }

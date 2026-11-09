@@ -42,6 +42,9 @@ public class SellerAdminMenuService {
         keyboard.add(List.of(Map.of("text", "👥 درخواست‌های دسترسی")));
         keyboard.add(List.of(Map.of("text", "👤 مدیریت کاربران")));
         keyboard.add(List.of(Map.of("text", "📦 مشاهده سفارش‌ها")));
+        keyboard.add(List.of(Map.of("text", "💰 مدیریت قیمت محصولات")));
+        keyboard.add(List.of(Map.of("text", "📦 مدیریت موجودی محصولات")));
+        keyboard.add(List.of(Map.of("text", "📊 گزارش سفارش‌ها")));
         if (userAccessService.hasPermission(chatId, UserPermission.VIEW_PRICE_HISTORY)) {
             keyboard.add(List.of(Map.of("text", "📊 تاریخچه قیمت محصولات")));
         }
@@ -248,17 +251,6 @@ public class SellerAdminMenuService {
                     ));
                 }
 
-                // مدیریت مجوز قیمت‌گذاری فقط توسط سوپرادمین
-                if (isSuperAdmin) {
-                    boolean priceManager = user.hasPermission(UserPermission.PRICE_MANAGER);
-                    keyboard.add(List.of(Map.of(
-                            "text", priceManager
-                                    ? "🔒 لغو مجوز قیمت‌گذاری " + user.name()
-                                    : "💰 اعطای مجوز قیمت‌گذاری " + user.name(),
-                            "callback_data", (priceManager ? "access:price-revoke:" : "access:price-grant:") + user.chatId()
-                    )));
-                }
-
                 // غیرفعال‌سازی فروشنده توسط مدیر یا مدیر اصلی
                 keyboard.add(List.of(
                         Map.of(
@@ -266,17 +258,6 @@ public class SellerAdminMenuService {
                                 "callback_data", "access:deactivate:" + user.chatId()
                         )
                 ));
-            }
-
-            // اگر کاربری با مجوز قیمت‌گذاری به مدیر ارتقا یافت، امکان لغو مجوز همچنان وجود دارد
-            if (isSuperAdmin
-                    && user.status() == UserStatus.APPROVED
-                    && user.role() == UserRole.ADMIN
-                    && user.hasPermission(UserPermission.PRICE_MANAGER)) {
-                keyboard.add(List.of(Map.of(
-                        "text", "🔒 لغو مجوز قیمت‌گذاری " + user.name(),
-                        "callback_data", "access:price-revoke:" + user.chatId()
-                )));
             }
 
             // عملیات روی مدیر تأییدشده فقط توسط مدیر اصلی

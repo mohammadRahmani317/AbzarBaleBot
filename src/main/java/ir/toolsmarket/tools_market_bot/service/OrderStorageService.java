@@ -1,56 +1,82 @@
-
 package ir.toolsmarket.tools_market_bot.service;
 
-import ir.toolsmarket.tools_market_bot.model.Order;
+import ir.toolsmarket.tools_market_bot.model.*;
+import ir.toolsmarket.tools_market_bot.util.AtomicJsonFile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-
+import tools.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.*;
+import java.util.*;
+import java.util.function.Function;
 
 @Service
 public class OrderStorageService {
+    private final ObjectMapper mapper;
+    private final Path filePath;
+    private final Path legacyPath;
 
-    private final ObjectMapper objectMapper;
-
-    // فایل ذخیره سفارش‌ها
-    private final Path filePath = Path.of("data", "orders.json");
-
-    public OrderStorageService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    @org.springframework.beans.factory.annotation.Autowired
+    public OrderStorageService(ObjectMapper mapper,
+            @Value("${tools-market.storage.order-state-file:data/order-state.json}") String file,
+            @Value("${tools-market.storage.orders-file:data/orders.json}") String legacyFile) {
+        this.mapper = mapper;
+        this.filePath = Path.of(file);
+        this.legacyPath = Path.of(legacyFile);
     }
 
-    // ذخیره سفارش جدید
-    public synchronized void save(Order order) throws IOException {
-
-        Files.createDirectories(filePath.getParent());
-
-        List<Order> orders = readOrders();
-        orders.add(order);
-
-        objectMapper.writerWithDefaultPrettyPrinter()
-                .writeValue(filePath.toFile(), orders);
+    public OrderStorageService(ObjectMapper mapper) {
+        this(mapper, "data/order-state.json", "data/orders.json");
     }
 
-    // دریافت تمام سفارش‌ها
+    /** All stock/order mutations use this lock and one atomic file replacement. */
+    synchronized <T> T transact(Function<OrderStore, T> operation) {
+        OrderStore state = read();
+        T result = operation.apply(state);
+        AtomicJsonFile.write(mapper, filePath, state);
+        return result;
+    }
+
+    synchronized OrderStore snapshot() { return read(); }
+
     public synchronized List<Order> findAll() throws IOException {
-        return readOrders();
+        return List.copyOf(read().orders().values());
     }
 
-    // خواندن سفارش‌های ذخیره‌شده
-    private List<Order> readOrders() throws IOException {
+    /** Compatibility entry point for legacy imports only; new invoices must go through OrderService. */
+    public synchronized void save(Order order) throws IOException {
+        if (!order.legacy()) throw new IllegalArgumentException("از سرویس سفارش استفاده کنید.");
+        transact(state -> {
+            if (state.orders().putIfAbsent(order.orderId(), order) != null)
+                throw new IllegalArgumentException("شناسه سفارش تکراری است.");
+            return null;
+        });
+    }
 
-        if (Files.notExists(filePath)) {
-            return new ArrayList<>();
+    private OrderStore read() {
+        if (Files.exists(filePath)) return mapper.readValue(filePath.toFile(), OrderStore.class);
+        OrderStore state = OrderStore.empty();
+        if (Files.exists(legacyPath)) {
+            try {
+                Path backup = legacyPath.resolveSibling(legacyPath.getFileName() + ".pre-cart.bak");
+                if (Files.notExists(backup)) Files.copy(legacyPath, backup);
+                for (var node : mapper.readTree(legacyPath.toFile())) {
+                    ObjectNode value = (ObjectNode) node.deepCopy();
+                    String status = value.path("status").asText("");
+                    // Unknown historical states are evidence, never a reason to deduct stock.
+                    value.put("legacyStatus", status);
+                    value.putNull("status");
+                    value.put("legacy", true);
+                    Order order = mapper.treeToValue(value, Order.class);
+                    if (state.orders().putIfAbsent(order.orderId(), order) != null)
+                        throw new IllegalStateException("شناسه تکراری در سفارش‌های قدیمی");
+                }
+            } catch (IOException exception) {
+                throw new IllegalStateException("خطا در پشتیبان‌گیری سفارش‌های قدیمی", exception);
+            }
         }
-
-        return objectMapper.readValue(
-                filePath.toFile(),
-                new TypeReference<List<Order>>() {}
-        );
+        AtomicJsonFile.write(mapper, filePath, state);
+        return state;
     }
 }

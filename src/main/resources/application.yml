@@ -6,9 +6,12 @@ server:
 
 tools-market:
   bale:
-    base-url: https://tapi.bale.ai
-    token: "1157674478:m-FBQhDQzQZBWlQ9u-ZhqJQRLeHSkooNgfE"
-    seller-token: "1753038435:eNZJvMbXhzsNo3O6-VXcPs0QuoMR_dkbgdU"
-    super-admin-chat-id: "1972662390"
+    base-url: ${BALE_BASE_URL:https://tapi.bale.ai}
+    token: ${BALE_CUSTOMER_TOKEN:1157674478:m-FBQhDQzQZBWlQ9u-ZhqJQRLeHSkooNgfE}
+    seller-token: ${BALE_SELLER_TOKEN:1753038435:eNZJvMbXhzsNo3O6-VXcPs0QuoMR_dkbgdU}
+    super-admin-chat-id: ${BALE_SUPER_ADMIN_CHAT_ID:1972662390}
   storage:
-    product-prices-file: data/product-prices.json
+    product-prices-file: ${PRODUCT_PRICES_FILE:data/product-prices.json}
+    users-file: ${USERS_FILE:data/users.json}
+    orders-file: ${LEGACY_ORDERS_FILE:data/orders.json}
+    order-state-file: ${ORDER_STATE_FILE:data/order-state.json}

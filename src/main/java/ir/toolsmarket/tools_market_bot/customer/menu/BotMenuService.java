@@ -5,8 +5,6 @@ import ir.toolsmarket.tools_market_bot.model.ProductCategory;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.service.ProductPriceService;
 import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
@@ -35,6 +33,7 @@ public class BotMenuService {
         List<List<String>> keyboard = List.of(
                 List.of(BotMenuOption.VIEW_PRODUCTS.getTitle()),
                 List.of(BotMenuOption.CREATE_ORDER.getTitle()),
+                List.of("🛒 سبد خرید", "👤 اطلاعات من"),
                 List.of(BotMenuOption.CONTACT_SELLER.getTitle())
         );
 
@@ -120,22 +119,7 @@ public class BotMenuService {
 
     // نمایش پیام ثبت سفارش
     public void showOrderGuide(String chatId) {
-
-        baleBotClient.sendMessage(
-                chatId,
-                """
-                        📦 ثبت سفارش
-                        
-                        لطفاً اطلاعات زیر را ارسال کنید:
-                        
-                        ۱. نام و نام خانوادگی
-                        ۲. شماره تماس
-                        ۳. نام محصول
-                        ۴. تعداد موردنیاز
-                        
-                        فروشنده برای هماهنگی با شما تماس خواهد گرفت.
-                        """
-        );
+        showCategoriesMenu(chatId);
     }
 
     // نمایش راه ارتباط با فروشنده
@@ -217,7 +201,8 @@ public class BotMenuService {
                 // اندازه‌گیری زمان خواندن عکس
                 long readStart = System.currentTimeMillis();
 
-                byte[] photoBytes = image.getInputStream().readAllBytes();
+                byte[] photoBytes;
+                try (var stream = image.getInputStream()) { photoBytes = stream.readAllBytes(); }
 
                 long readTime = System.currentTimeMillis() - readStart;
 
@@ -247,15 +232,7 @@ public class BotMenuService {
                         sendTime
                 );
 
-                /*long sendStart = System.currentTimeMillis();
 
-                baleBotClient.sendMessage(chatId, caption, replyMarkup);
-
-                log.info(
-                        "ارسال پیام متنی به بله {} میلی‌ثانیه طول کشید",
-                        System.currentTimeMillis() - sendStart
-                );
-*/
             } else {
                 log.warn(
                         "عکس محصول {} پیدا نشد: {}",
@@ -269,9 +246,9 @@ public class BotMenuService {
         } catch (Exception exception) {
 
             log.error(
-                    "خطا در نمایش جزئیات محصول {}",
+                    "خطا در نمایش جزئیات محصول {} ({})",
                     product.name(),
-                    exception
+                    exception.getClass().getSimpleName()
             );
 
             baleBotClient.sendMessage(chatId, caption, replyMarkup);
@@ -287,23 +264,7 @@ public class BotMenuService {
 
     // نمایش راهنمای سفارش برای یک محصول مشخص
     public void showOrderGuide(String chatId, Product product) {
-
-        baleBotClient.sendMessage(
-                chatId,
-                """
-                        📦 ثبت سفارش
-                        
-                        محصول انتخاب‌شده: %s
-                        
-                        لطفاً اطلاعات زیر را ارسال کنید:
-                        
-                        ۱. نام و نام خانوادگی
-                        ۲. شماره تماس
-                        ۳. تعداد موردنیاز
-                        
-                        فروشنده برای هماهنگی با شما تماس خواهد گرفت.
-                        """.formatted(product.name())
-        );
+        showProductDetail(chatId, product);
     }
 
     public void showOrderConfirmation(
@@ -335,8 +296,6 @@ public class BotMenuService {
         );
     }
     private static String formatPrice(BigDecimal price) {
-        return NumberFormat.getNumberInstance(Locale.forLanguageTag("fa-IR"))
-                .format(price) + " تومان";
+        return ir.toolsmarket.tools_market_bot.util.BotFormatting.price(price);
     }
-
 }

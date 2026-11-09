@@ -33,6 +33,8 @@ public class SellerUpdateService {
     private final PriceManagementMenuService priceManagementMenuService;
     private final Map<String, Integer> awaitingPriceInput = new ConcurrentHashMap<>();
 
+    private final ir.toolsmarket.tools_market_bot.seller.menu.InventoryMenuService inventoryMenu;
+    private final Map<String, Integer> awaitingInventoryInput = new ConcurrentHashMap<>();
     private long nextUpdateId = 0;
 
     public SellerUpdateService(
@@ -41,7 +43,8 @@ public class SellerUpdateService {
             UserAccessService userAccessService,
             BaleBotProperties properties,
             SellerAdminMenuService sellerAdminMenuService,
-            PriceManagementMenuService priceManagementMenuService
+            PriceManagementMenuService priceManagementMenuService,
+            ir.toolsmarket.tools_market_bot.seller.menu.InventoryMenuService inventoryMenu
     ) {
         this.baleBotClient = baleBotClient;
         this.sellerMenuService = sellerMenuService;
@@ -49,29 +52,29 @@ public class SellerUpdateService {
         this.properties = properties;
         this.sellerAdminMenuService = sellerAdminMenuService;
         this.priceManagementMenuService = priceManagementMenuService;
+        this.inventoryMenu = inventoryMenu;
     }
 
     @Scheduled(fixedDelay = 1000)
     public void receiveUpdates() {
-
+        if (!baleBotClient.configured()) return;
         try {
             JsonNode response = baleBotClient.getUpdates(nextUpdateId);
 
             if (response == null || !response.path("ok").asBoolean()) {
-                log.warn("دریافت آپدیت از بات فروشنده ناموفق بود: {}", response);
+                log.warn("دریافت آپدیت از بات فروشنده ناموفق بود");
                 return;
             }
 
             for (JsonNode update : response.path("result")) {
 
-                processUpdate(update);
-
-                nextUpdateId =
-                        update.path("update_id").asLong() + 1;
+                try { processUpdate(update); }
+                catch (Exception exception) { log.error("Seller update failed ({})", exception.getClass().getSimpleName()); }
+                finally { nextUpdateId = update.path("update_id").asLong() + 1; }
             }
 
         } catch (Exception exception) {
-            log.error("خطا در دریافت پیام از بات فروشنده", exception);
+            log.warn("Seller polling failed ({})", exception.getClass().getSimpleName());
         }
     }
 
@@ -103,7 +106,12 @@ public class SellerUpdateService {
             return;
         }
 
-        log.info("پیام دریافتی از فروشنده {}: {}", chatId, text);
+        if (!chatId.equals(message.path("from").path("id").asText())) return;
+        try {
+            if (handleOperationalMessage(chatId, text)) return;
+        } catch (IllegalArgumentException exception) {
+            baleBotClient.sendMessage(chatId, exception.getMessage()); return;
+        }
 
         Integer pendingProductId = awaitingPriceInput.get(chatId);
         if (pendingProductId != null) {
@@ -153,8 +161,6 @@ public class SellerUpdateService {
 
             if (userOptional.isEmpty()
                     || userOptional.get().status() != UserStatus.APPROVED
-//                    || userOptional.get().role() == UserRole.SUPER_ADMIN
-//                    || userOptional.get().role() == UserRole.ADMIN
             ) {
 
                 return;
@@ -332,15 +338,23 @@ public class SellerUpdateService {
         try {
             baleBotClient.answerCallbackQuery(callbackQueryId);
         } catch (Exception e) {
-            log.warn("پاسخ به درخواست دکمه بله ناموفق بود: {}", e.getMessage());
+            log.warn("پاسخ به درخواست دکمه بله ناموفق بود ({})", e.getClass().getSimpleName());
         }
 
-        // عملیات قیمت‌گذاری دسترسی مستقل از نقش مدیر دارد
+        if (!adminChatId.equals(callbackQuery.path("message").path("chat").path("id").asText())) return;
+        try {
+            if (handleOperationalCallback(adminChatId, callbackData)) return;
+        } catch (IllegalArgumentException exception) {
+            baleBotClient.sendMessage(adminChatId, exception.getMessage()); return;
+        }
+
+        // عملیات قیمت‌گذاری برای تمام نقش‌های عملیاتی فعال است
         if (callbackData.startsWith("price:edit:")) {
             String productIdText = callbackData.substring("price:edit:".length());
             try {
                 Integer productId = Integer.parseInt(productIdText);
                 if (priceManagementMenuService.requestPriceUpdate(adminChatId, productId)) {
+                    awaitingInventoryInput.remove(adminChatId);
                     awaitingPriceInput.put(adminChatId, productId);
                 }
             } catch (NumberFormatException exception) {
@@ -930,23 +944,50 @@ public class SellerUpdateService {
 
 
     private BigDecimal parseTomanPrice(String rawValue) {
-        String normalized = rawValue
-                .replace("٬", "")
-                .replace(",", "")
-                .replace("،", "")
-                .replace(" ", "")
-                .replace("۰", "0").replace("۱", "1").replace("۲", "2")
-                .replace("۳", "3").replace("۴", "4").replace("۵", "5")
-                .replace("۶", "6").replace("۷", "7").replace("۸", "8")
-                .replace("۹", "9")
-                .replace("٠", "0").replace("١", "1").replace("٢", "2")
-                .replace("٣", "3").replace("٤", "4").replace("٥", "5")
-                .replace("٦", "6").replace("٧", "7").replace("٨", "8")
-                .replace("٩", "9");
+        String normalized = ir.toolsmarket.tools_market_bot.util.BotFormatting.digits(rawValue)
+                .replace("٬", "").replace(",", "").replace("،", "").replace(" ", "");
         if (!normalized.matches("\\d+")) {
             throw new NumberFormatException("قیمت باید عدد صحیح باشد");
         }
         return new BigDecimal(normalized);
     }
 
+
+    private boolean handleOperationalMessage(String actor, String text) {
+        if ("/start".equals(text)) {
+            awaitingInventoryInput.remove(actor); awaitingPriceInput.remove(actor); return false;
+        }
+        Integer id = awaitingInventoryInput.get(actor);
+        if (id != null) {
+            if ("لغو".equals(text)) { awaitingInventoryInput.remove(actor); showUserMenu(actor); return true; }
+            inventoryMenu.save(actor, id, text);
+            awaitingInventoryInput.remove(actor);
+            return true;
+        }
+        if ("📦 مدیریت موجودی محصولات".equals(text)) { inventoryMenu.showProducts(actor); return true; }
+        if ("📊 گزارش سفارش‌ها".equals(text)) { sellerMenuService.showReports(actor); return true; }
+        return false;
+    }
+
+    private boolean handleOperationalCallback(String actor, String data) {
+        if (data.startsWith("inventory:edit:")) {
+            int id = ir.toolsmarket.tools_market_bot.util.BotFormatting.quantity(data.substring(15));
+            inventoryMenu.requestQuantity(actor, id);
+            awaitingPriceInput.remove(actor);
+            awaitingInventoryInput.put(actor, id);
+            return true;
+        }
+        if (!data.startsWith("orders:")) return false;
+        String[] parts = data.split(":", 3);
+        if (parts.length != 3) throw new IllegalArgumentException("درخواست نامعتبر است.");
+        switch (parts[1]) {
+            case "list" -> sellerMenuService.showOrderList(actor, parts[2]);
+            case "view" -> sellerMenuService.showOrder(actor, parts[2]);
+            case "prepare" -> sellerMenuService.prepare(actor, parts[2]);
+            case "deliver" -> sellerMenuService.deliver(actor, parts[2]);
+            case "history" -> sellerMenuService.showHistory(actor, parts[2]);
+            default -> throw new IllegalArgumentException("درخواست نامعتبر است.");
+        }
+        return true;
+    }
 }

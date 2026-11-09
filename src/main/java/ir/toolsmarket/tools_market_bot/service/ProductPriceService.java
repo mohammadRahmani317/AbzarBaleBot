@@ -6,12 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -27,14 +24,18 @@ public class ProductPriceService {
 
     private final ObjectMapper objectMapper;
     private final Path filePath;
+    private final UserAccessService access;
+    private final ProductCatalogService catalog;
 
     public ProductPriceService(
             ObjectMapper objectMapper,
             @Value("${tools-market.storage.product-prices-file:data/product-prices.json}")
-            String filePath
+            String filePath, UserAccessService access, ProductCatalogService catalog
     ) {
         this.objectMapper = objectMapper;
         this.filePath = Path.of(filePath);
+        this.access = access;
+        this.catalog = catalog;
     }
 
     public synchronized Optional<BigDecimal> findCurrentPrice(
@@ -49,7 +50,9 @@ public class ProductPriceService {
         return readStore().prices();
     }
 
-    public synchronized List<ProductPriceHistory> findHistory(Integer productId) {
+    public synchronized List<ProductPriceHistory> findHistory(Integer productId, String actor) {
+        if (!access.hasPermission(actor, ir.toolsmarket.tools_market_bot.model.UserPermission.VIEW_PRICE_HISTORY))
+            throw new IllegalArgumentException("فقط مدیر اصلی اجازه مشاهده تاریخچه قیمت را دارد.");
         return readStore().history().stream()
                 .filter(item -> item.productId().equals(productId))
                 .sorted(Comparator.comparing(ProductPriceHistory::changedAt))
@@ -65,6 +68,8 @@ public class ProductPriceService {
             String changedByChatId,
             String changedByName
     ) {
+        access.requireOperator(changedByChatId);
+        if (catalog.findById(productId).isEmpty()) throw new IllegalArgumentException("محصول پیدا نشد.");
         if (productId == null || newPrice == null
                 || newPrice.signum() <= 0) {
             throw new IllegalArgumentException(
@@ -151,45 +156,6 @@ public class ProductPriceService {
     }
 
     private void writeStore(ProductPriceStore store) {
-        Path parent = filePath.toAbsolutePath().getParent();
-
-        Path temporaryFile = filePath.resolveSibling(
-                filePath.getFileName() + ".tmp"
-        );
-
-        try {
-            Files.createDirectories(parent);
-
-            objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(temporaryFile.toFile(), store);
-
-            try {
-                Files.move(
-                        temporaryFile,
-                        filePath,
-                        StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE
-                );
-
-            } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(
-                        temporaryFile,
-                        filePath,
-                        StandardCopyOption.REPLACE_EXISTING
-                );
-            }
-
-        } catch (IOException exception) {
-
-            try {
-                Files.deleteIfExists(temporaryFile);
-            } catch (IOException ignored) {
-            }
-
-            throw new IllegalStateException(
-                    "خطا در ذخیره اطلاعات قیمت محصولات",
-                    exception
-            );
-        }
+        ir.toolsmarket.tools_market_bot.util.AtomicJsonFile.write(objectMapper, filePath, store);
     }
 }

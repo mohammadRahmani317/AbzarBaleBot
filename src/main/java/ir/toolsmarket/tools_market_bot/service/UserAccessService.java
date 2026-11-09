@@ -10,7 +10,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -22,10 +21,12 @@ public class UserAccessService {
 
     private final ObjectMapper objectMapper;
 
-    private final Path filePath = Path.of("data/users.json");
+    private final Path filePath;
 
-    public UserAccessService(ObjectMapper objectMapper) {
+    public UserAccessService(ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Value("${tools-market.storage.users-file:data/users.json}") String file) {
         this.objectMapper = objectMapper;
+        this.filePath = Path.of(file);
     }
 
     // دریافت تمام کاربران
@@ -128,18 +129,7 @@ public class UserAccessService {
 
     // ذخیره کاربران در فایل JSON
     private void writeUsers(List<User> users) {
-        try {
-            Files.createDirectories(filePath.getParent());
-
-            objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(filePath.toFile(), users);
-
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "خطا در ذخیره اطلاعات کاربران",
-                    exception
-            );
-        }
+        ir.toolsmarket.tools_market_bot.util.AtomicJsonFile.write(objectMapper, filePath, users);
     }
 
     // ثبت یا اصلاح اطلاعات مدیر اصلی
@@ -188,7 +178,10 @@ public class UserAccessService {
     public synchronized boolean hasPermission(String chatId, UserPermission permission) {
         return findByChatId(chatId)
                 .filter(user -> user.status() == UserStatus.APPROVED)
-                .map(user -> user.hasPermission(permission))
+                .map(user -> switch (permission) {
+                    case PRICE_MANAGER -> isOperationalRole(user.role());
+                    case VIEW_PRICE_HISTORY -> user.role() == UserRole.SUPER_ADMIN;
+                })
                 .orElse(false);
     }
 
@@ -225,5 +218,26 @@ public class UserAccessService {
         return readUsers().stream()
                 .filter(user -> user.status() == UserStatus.PENDING)
                 .toList();
+    }
+
+    private boolean isOperationalRole(UserRole role) {
+        return role == UserRole.SELLER || role == UserRole.ADMIN || role == UserRole.SUPER_ADMIN;
+    }
+
+    public User requireOperator(String chatId) {
+        return findByChatId(chatId).filter(user -> user.status() == UserStatus.APPROVED)
+                .filter(user -> isOperationalRole(user.role()))
+                .orElseThrow(() -> new IllegalArgumentException("شما اجازه انجام این عملیات را ندارید."));
+    }
+
+    public boolean canComplete(User user, String responsibleChatId) {
+        return user.status() == UserStatus.APPROVED && (user.role() == UserRole.ADMIN
+                || user.role() == UserRole.SUPER_ADMIN
+                || (user.role() == UserRole.SELLER && user.chatId().equals(responsibleChatId)));
+    }
+
+    public List<User> orderNotificationRecipients() {
+        return findAll().stream().filter(user -> user.status() == UserStatus.APPROVED)
+                .filter(user -> user.role() == UserRole.SELLER || user.role() == UserRole.ADMIN).toList();
     }
 }

@@ -14,11 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -292,7 +290,7 @@ public class PriceManagementMenuService {
             return;
         }
 
-        List<ProductPriceHistory> history = productPriceService.findHistory(productId);
+        List<ProductPriceHistory> history = productPriceService.findHistory(productId, chatId);
 
         if (history.isEmpty()) {
             baleBotClient.sendMessage(
@@ -495,19 +493,10 @@ public class PriceManagementMenuService {
      * نمایش قیمت با جداکننده هزارگان
      */
     private static String formatPrice(BigDecimal price) {
-
-        return NumberFormat
-                .getNumberInstance(Locale.forLanguageTag("fa-IR"))
-                .format(price) + " تومان";
+        return ir.toolsmarket.tools_market_bot.util.BotFormatting.price(price);
     }
 
-    /**
-     * نمایش اعداد فارسی
-     */
     private static String formatNumber(int number) {
-
-        return NumberFormat
-                .getIntegerInstance(Locale.forLanguageTag("fa-IR"))
-                .format(number);
+        return ir.toolsmarket.tools_market_bot.util.BotFormatting.number(number);
     }
 }
