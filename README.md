@@ -1,6 +1,6 @@
 # Tools Market Bot
 
-Java 21 / Spring Boot 4 application with separate Bale customer and seller bots, Maven, Jackson 3 and JSON persistence. The existing package structure, catalog, pricing/history/chart implementation, user approval policy and callbacks are retained.
+Java 21 / Spring Boot 4 application with separate Bale customer and seller bots, Maven, Jackson 3 and JSON persistence. The package structure, pricing/history/chart implementation, user approval policy and callback wire formats are retained. Products are now editable and persisted alongside order and inventory state.
 
 ## Implemented behavior
 
@@ -9,13 +9,52 @@ Java 21 / Spring Boot 4 application with separate Bale customer and seller bots,
 - Inventory management from `📦 مدیریت موجودی محصولات`. Missing stock means zero available. Manual totals must be nonnegative and at least the reserved quantity. Changes record actor, old/new totals and timestamp.
 - Checkout revalidates every product, price and quantity, then saves immutable price snapshots and reserves stock. One pending invoice per customer prevents repeated checkout from reserving twice.
 - Successful invoice API delivery starts the two-hour deadline. Failed delivery cancels the provisional invoice and releases stock. If the process stops during delivery, an unsent reservation is cancelled after five minutes by recovery checks.
-- Exactly six business statuses: `WAITING_CUSTOMER`, `CANCELLED`, `EXPIRED`, `CONFIRMED`, `PREPARING`, `DELIVERED`. Unknown legacy statuses are stored separately, not mapped to confirmed orders.
+- The original six lifecycle statuses: `WAITING_CUSTOMER`, `CANCELLED`, `EXPIRED`, `CONFIRMED`, `PREPARING`, `DELIVERED`. The additional `REJECTED` status is readable/displayable for historical records; no rejection transition is introduced. Unknown legacy statuses are stored separately, not mapped to confirmed orders.
 - Customer-only confirmation/cancellation, expiration checks on both decisions and every 30 seconds, atomic deduction/release, idempotent callbacks, and chronological status history.
 - First preparation claim records the responsible user. That seller or any approved admin/super-admin can deliver. Preparation and delivery never deduct stock again.
 - Seller lists for active, delivered, cancelled, expired and all orders. Details include products, snapshots, customer information, status, actors and Persian dates/times.
 - Persisted notification retries every 15 seconds after confirmation only. Approved sellers and admins receive notifications; super-admins are excluded, including users promoted before delivery. A failed notification does not undo confirmation.
-- Persisted reports for all six statuses, legacy counts, disjoint order-value buckets, stock/reservations/availability and confirmed/preparing versus delivered product quantities. Values are not labelled received revenue.
+- Persisted reports for all supported statuses, legacy counts, disjoint order-value buckets, stock/reservations/availability and confirmed/preparing versus delivered product quantities. Values are not labelled received revenue.
 - All approved `SELLER`, `ADMIN`, `SUPER_ADMIN` users can price products, manage stock, manage orders, and view reports. Only `SUPER_ADMIN` can see price history, even if a different role has a legacy history permission flag. Customer ordering is independent of staff roles.
+
+
+## Product management, customer history and typed bot actions
+
+- Approved users authorized by `UserAccessService.hasPermission(..., PRICE_MANAGER)` can open `🛠 مدیریت محصولات`. The existing policy continues to authorize approved seller/admin/super-admin roles. Access is checked again in catalog and inventory service mutations, including when an input form outlives the user's access.
+- Add a product by entering name, brand, description, category code and initial stock. Edit existing metadata with the same guided form; `-` retains an existing field. Price remains managed through the existing price menu. New products may have no image; they are shown as text. Existing images are preserved by the edit form.
+- Product fields now include `brand`, `stockQuantity` and `deleted`. Old product JSON without these fields remains readable with empty brand, zero stock and `deleted=false`. Existing inventory takes precedence over seed stock during migration.
+- Deleting a product requires a confirmation button and marks it deleted. New browsing/cart additions/checkout and price/stock edits exclude deleted products. Existing issued invoices can still complete against their snapshots and reservations. Product IDs are not reused; price history and order records remain. Super-admin price history and inventory/product reports still include archived products.
+- In `📦 مدیریت موجودی محصولات`, enter an unsigned number for an absolute total, `+5` to add five, or `-2` to remove two. Persian digits are accepted. Updates are atomic, audited, reject overflow and cannot reduce total below reserved stock.
+- Customer menu `📦 سفارش‌های قبلی من` lists all that customer's orders, newest first, in batches of 15 buttons. Details show immutable product/price snapshots, quantities, total, dates and status. Ownership is checked in `OrderService.listForCustomer` and `findForCustomer`; missing and foreign IDs receive the same response. Historical records with unknown prices remain marked unknown. Known legacy status labels, including rejected, are translated for display without changing persisted legacy status or enabling transitions.
+- `bot/BotCallback.java` centralizes callback actions, validated parsing/encoding and typed order-list groups. It retains old wire values, rejects missing/extra/invalid payloads and enforces Bale's 64-byte callback limit. `OrderMessages.button` accepts a typed callback. `bot/BotButton.java` centralizes fixed labels/commands; handlers compare enums. Customer profile input and product form steps also use enums. Names, descriptions and other free text remain strings.
+
+Additional tests cover product persistence/restart, old JSON compatibility, soft deletion, stock bounds and write failures, private customer history, legacy display, old callback compatibility, malformed callbacks and access-management routing.
+
+In environments where Mockito cannot self-attach, load the project's resolved Mockito jar as a test JVM agent. For the current dependencies, verification can use:
+
+```bash
+mvn -s /tmp/tools-market-maven-settings.xml -o -B \
+  -DargLine=-javaagent:$HOME/.m2/repository/org/mockito/mockito-core/5.20.0/mockito-core-5.20.0.jar \
+  clean verify
+```
+
+The temporary Maven settings file is environment-specific; create it using the example below if needed. The agent jar version must match the resolved Mockito dependency. This command runs isolated tests and creates the executable JAR without starting live bots.
+
+## Changed files for the product/history/callback tasks
+
+Paths below are relative to `src/main/java/ir/toolsmarket/tools_market_bot/`, except the final two rows.
+
+| Area | Added or updated files |
+| --- | --- |
+| Product model and persistence | `model/Product.java`, `model/OrderStore.java`, `service/ProductCatalogService.java`, `service/OrderStorageService.java` |
+| Inventory and access | `service/InventoryService.java`, `service/UserAccessService.java`, `seller/menu/InventoryMenuService.java`, new `seller/menu/ProductManagementMenuService.java` |
+| Customer order history | `service/OrderService.java`, `model/OrderStatus.java`, `util/OrderMessages.java`, `customer/service/CustomerUpdateService.java`, `customer/menu/BotMenuService.java`, `customer/menu/BotMenuOption.java` |
+| Central bot contracts | new `bot/BotCallback.java`, new `bot/BotButton.java` |
+| Seller menus and routing | `seller/service/SellerUpdateService.java`, `seller/menu/SellerMenuService.java`, `seller/menu/SellerAdminMenuService.java`, `seller/menu/PriceManagementMenuService.java`, `seller/service/OrderNotificationService.java`, `service/OrderReportService.java` |
+| Tests (under `src/test/java/ir/toolsmarket/tools_market_bot/`) | new `bot/BotCallbackTest.java`, new `service/ProductManagementTest.java`, new `service/CustomerOrderHistoryTest.java`; updated `service/TestFixture.java`, `customer/service/CustomerUpdateServiceTest.java`, `seller/service/SellerUpdateServiceTest.java` |
+| Repository documentation | `README.md`, `SKILL.md` |
+
+Validation for these changes: **71 tests passed; zero failures, errors or skips**. Full `clean verify` completed successfully with the temporary Central settings and Mockito agent command above. The executable artifact is `target/tools-market-bot-0.0.1-SNAPSHOT.jar`. Existing tracked JSON data, seed resources, application connection configuration and dependency versions were not changed. Live Bale acceptance was not run.
 
 ## Configure and run
 
@@ -27,7 +66,7 @@ BALE_SELLER_TOKEN
 BALE_SUPER_ADMIN_CHAT_ID
 ```
 
-Previously committed bot credentials have been removed from application configuration; replace those credentials before deployment. Empty tokens disable the corresponding polling client. The super-admin chat ID is required on application startup by the existing initializer.
+The current `application.yml` contains nonempty fallback values for bot credentials and the super-admin ID. Supply your own environment configuration. Explicitly empty tokens disable the corresponding polling client; do not assume unset environment variables disable polling. The existing initializer creates/updates the configured super-admin at startup.
 
 ```bash
 mvn clean verify
@@ -51,9 +90,9 @@ Optional configuration:
 
 ## Persistence and compatibility
 
-`src/main/resources/data/products.json` remains the catalog. Existing `data/users.json` and `data/product-prices.json` retain their schemas and contents, including permission flags and price history. Writes now use the shared atomic JSON writer.
+`src/main/resources/data/products.json` is the initial seed catalog. On the first catalog load without persisted products, it is copied into the `products` map of `data/order-state.json`; subsequent starts use the persisted catalog. Existing inventory and orders are preserved during this additive migration. Existing `data/users.json` and `data/product-prices.json` retain their schemas and contents, including permission flags and price history. Writes now use the shared atomic JSON writer.
 
-`data/order-state.json` is the authoritative aggregate for orders, inventory, customer profiles, status events, manual stock history and notification delivery records. Order and stock operations execute under one service lock and commit through a single atomically renamed, flushed file. A failed pre-commit write leaves both unchanged. Restart recovery reads this persisted snapshot, never guesses or recalculates historical stock deductions. Use a persistent writable local filesystem supporting atomic rename and fsync, and run **one application instance per data directory**.
+`data/order-state.json` is the authoritative aggregate for products, orders, inventory, customer profiles, status events, manual stock history and notification delivery records. Product `stockQuantity` is synchronized from inventory totals on every commit; it is not a second independent stock balance. Order and stock operations execute under one service lock and commit through a single atomically renamed, flushed file. A failed pre-commit write leaves both unchanged. Restart recovery reads this persisted snapshot, never guesses or recalculates historical stock deductions. Use a persistent writable local filesystem supporting atomic rename and fsync, and run **one application instance per data directory**.
 
 On first access with no aggregate file, the application backs up `orders.json` to `orders.json.pre-cart.bak`, copies every old order into the aggregate, and leaves the source untouched. Subsequent starts read the aggregate, so import is idempotent. Preserve both the aggregate and its source backup in operational backups; do not delete the aggregate to “reset” an application that has accepted orders.
 
@@ -85,7 +124,7 @@ If needed, create your own temporary Maven settings containing:
 </settings>
 ```
 
-Actual results: 38 tests passed, zero failures, errors or skips. See `target/surefire-reports` for individual results. Live Bale delivery requires configured bots and remains a manual check.
+The earlier baseline recorded 38 passing tests. For the product/history/callback changes, use the current validation result below. See `target/surefire-reports` for individual results. Live Bale delivery requires configured bots and remains a manual check.
 
 ## Manual Bale acceptance guide
 

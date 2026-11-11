@@ -6,8 +6,8 @@ import java.util.*;
 
 public final class OrderMessages {
     private OrderMessages() { }
-    public static Map<String, Object> button(String text, String callback) {
-        return Map.of("text", text, "callback_data", callback);
+    public static Map<String, Object> button(String text, ir.toolsmarket.tools_market_bot.bot.BotCallback callback) {
+        return Map.of("text", text, "callback_data", callback.encode());
     }
     public static String items(List<OrderItem> items) {
         StringBuilder text = new StringBuilder();
@@ -19,11 +19,16 @@ public final class OrderMessages {
         }
         return text.toString();
     }
+    public static String statusTitle(Order order) {
+        if (!order.legacy()) return order.status().title();
+        return OrderStatus.fromStoredLabel(order.legacyStatus()).map(OrderStatus::title)
+                .orElse("قدیمی؛ وضعیت نامشخص (" + Objects.toString(order.legacyStatus(), "") + ")");
+    }
     public static String details(Order order) {
         return "🧾 ابزارمارکت\nشماره سفارش: " + order.orderId()
                 + "\nمشتری: " + order.customerName() + "\nتلفن: " + order.phoneNumber()
                 + "\n\n" + items(order.items()) + "\nمبلغ کل: " + (order.items().stream().anyMatch(item -> item.unitPriceSnapshot() == null) ? "نامشخص" : BotFormatting.price(order.totalAmount()))
-                + "\nوضعیت: " + (order.legacy() ? "قدیمی؛ وضعیت نامشخص (" + Objects.toString(order.legacyStatus(), "") + ")" : order.status().title())
+                + "\nوضعیت: " + statusTitle(order)
                 + "\nایجاد — " + BotFormatting.dateTime(order.createdAt())
                 + "\nارسال فاکتور — " + BotFormatting.dateTime(order.invoiceSentAt())
                 + "\nپایان اعتبار — " + BotFormatting.dateTime(order.expiresAt())

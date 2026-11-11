@@ -34,6 +34,9 @@ public class OrderStorageService {
     synchronized <T> T transact(Function<OrderStore, T> operation) {
         OrderStore state = read();
         T result = operation.apply(state);
+        // Keep the public product stock field consistent with authoritative inventory on every commit.
+        state.products().replaceAll((id, product) -> product.withStock(
+                state.inventory().getOrDefault(id, new ProductInventory(id, 0, 0, null)).totalQuantity()));
         AtomicJsonFile.write(mapper, filePath, state);
         return result;
     }

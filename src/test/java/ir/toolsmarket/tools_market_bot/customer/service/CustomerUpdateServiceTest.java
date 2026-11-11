@@ -23,7 +23,7 @@ class CustomerUpdateServiceTest {
         JsonNode success = f.mapper.readTree("{\"ok\":true}");
         when(client.sendMessage(anyString(), anyString())).thenReturn(success);
         when(client.sendMessage(anyString(), anyString(), anyMap())).thenReturn(success);
-        handler = new CustomerUpdateService(client, f.catalog, new BotMenuService(client, f.prices),
+        handler = new CustomerUpdateService(client, f.catalog, new BotMenuService(client, f.prices, f.inventory),
                 new OrderSessionService(), f.cart, f.customers, f.orders);
     }
     void message(String id, String text) {
@@ -86,5 +86,41 @@ class CustomerUpdateServiceTest {
         var order = f.invoice("customer", 3);
         callback("customer", "order:confirm");
         assertEquals(OrderStatus.WAITING_CUSTOMER, f.orders.findForOperator(order.orderId(), "seller").status());
+    }
+    @Test void customerHistoryMenuAndCallbacksNeverExposeOtherCustomersOrders() {
+        var own = f.invoice("customer", 1);
+        var foreign = f.invoice("customer2", 1);
+        message("customer", "📦 سفارش‌های قبلی من");
+        verify(client).sendMessage(eq("customer"), contains("سفارش‌های قبلی"), argThat(markup ->
+                markup.toString().contains(own.orderId()) && !markup.toString().contains(foreign.orderId())));
+        callback("customer", "customer-orders:view:" + own.orderId());
+        verify(client).sendMessage(eq("customer"), contains("قیمت واحد"), anyMap());
+        clearInvocations(client);
+        callback("customer", "customer-orders:view:" + foreign.orderId());
+        verify(client).sendMessage("customer", "سفارش پیدا نشد.");
+        verify(client, never()).sendMessage(eq("customer"), contains("قیمت واحد"), anyMap());
+    }
+    @Test void malformedAndSellerOnlyCallbacksCannotMutateCustomerData() {
+        callback("customer", "product:order:1:extra");
+        callback("customer", "cart:remove:-1");
+        callback("customer", "catalog:delete-confirm:1");
+        assertTrue(f.catalog.findById(1).isPresent());
+        assertTrue(f.cart.quantities("customer").isEmpty());
+        assertTrue(f.orders.listForCustomer("customer").isEmpty());
+    }
+    @Test void switchingFromQuantityToProfileUsesTheTypedProfileInput() {
+        callback("customer", "product:order:1");
+        callback("customer", "profile:name"); message("customer", "نام ویرایش‌شده");
+        assertEquals("نام ویرایش‌شده", f.customers.find("customer").orElseThrow().name());
+        assertTrue(f.cart.quantities("customer").isEmpty());
+        callback("customer", "product:order:1"); message("customer", "لغو");
+        message("customer", "2"); assertTrue(f.cart.quantities("customer").isEmpty());
+    }
+    @Test void productDetailsShowBrandCurrentPriceAndAvailableStock() {
+        var product = f.catalog.create("seller", "HAND_TOOLS", "محصول نمایشی", "برند نمایشی", "توضیح", "", 7);
+        f.prices.updatePrice(product.id(), java.math.BigDecimal.valueOf(50000), "seller", "فروشنده");
+        callback("customer", "product:detail:" + product.id());
+        verify(client).sendMessage(eq("customer"), argThat(text -> text.contains("برند نمایشی")
+                && text.contains("تومان") && text.contains("موجودی قابل فروش") && text.contains("۷")), anyMap());
     }
 }
