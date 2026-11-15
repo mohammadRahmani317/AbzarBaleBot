@@ -1,5 +1,8 @@
 package ir.toolsmarket.tools_market_bot.seller.menu;
 
+import ir.toolsmarket.tools_market_bot.bot.BotCallback.Action;
+import ir.toolsmarket.tools_market_bot.bot.BotCallback;
+import ir.toolsmarket.tools_market_bot.bot.BotButton;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.model.UserRole;
 import ir.toolsmarket.tools_market_bot.model.UserStatus;
@@ -39,14 +42,15 @@ public class SellerAdminMenuService {
                 """.formatted(pendingCount);
 
         List<List<Map<String, Object>>> keyboard = new java.util.ArrayList<>();
-        keyboard.add(List.of(Map.of("text", "👥 درخواست‌های دسترسی")));
-        keyboard.add(List.of(Map.of("text", "👤 مدیریت کاربران")));
-        keyboard.add(List.of(Map.of("text", "📦 مشاهده سفارش‌ها")));
-        keyboard.add(List.of(Map.of("text", "💰 مدیریت قیمت محصولات")));
-        keyboard.add(List.of(Map.of("text", "📦 مدیریت موجودی محصولات")));
-        keyboard.add(List.of(Map.of("text", "📊 گزارش سفارش‌ها")));
+        keyboard.add(List.of(Map.of("text", BotButton.ACCESS_REQUESTS.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.MANAGE_USERS.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.ORDERS.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.MANAGE_PRICES.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.MANAGE_PRODUCTS.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.MANAGE_INVENTORY.text())));
+        keyboard.add(List.of(Map.of("text", BotButton.REPORTS.text())));
         if (userAccessService.hasPermission(chatId, UserPermission.VIEW_PRICE_HISTORY)) {
-            keyboard.add(List.of(Map.of("text", "📊 تاریخچه قیمت محصولات")));
+            keyboard.add(List.of(Map.of("text", BotButton.PRICE_HISTORY.text())));
         }
         Map<String, Object> replyMarkup = Map.of(
                 "keyboard", keyboard,
@@ -90,8 +94,8 @@ public class SellerAdminMenuService {
 
             keyboard.add(List.of(
                     Map.of(
-                            "text", "بررسی درخواست " + user.name(),
-                            "callback_data", "access:review:" + user.chatId()
+                            "text", BotButton.REVIEW_ACCESS.text() + user.name(),
+                            "callback_data", Action.ACCESS_REVIEW.callback(user.chatId()).encode()
                     )
             ));
         }
@@ -149,18 +153,18 @@ public class SellerAdminMenuService {
         List<List<Map<String, Object>>> keyboard = List.of(
                 List.of(
                         Map.of(
-                                "text", "✅ تأیید درخواست",
-                                "callback_data", "access:approve:" + targetChatId
+                                "text", BotButton.APPROVE_ACCESS.text(),
+                                "callback_data", Action.ACCESS_APPROVE.callback(targetChatId).encode()
                         ),
                         Map.of(
-                                "text", "❌ رد درخواست",
-                                "callback_data", "access:reject:" + targetChatId
+                                "text", BotButton.REJECT_ACCESS.text(),
+                                "callback_data", Action.ACCESS_REJECT.callback(targetChatId).encode()
                         )
                 ),
                 List.of(
                         Map.of(
-                                "text", "🔙 بازگشت به درخواست‌ها",
-                                "callback_data", "access:list"
+                                "text", BotButton.BACK_TO_ACCESS_REQUESTS.text(),
+                                "callback_data", Action.ACCESS_LIST.callback().encode()
                         )
                 )
         );
@@ -231,8 +235,8 @@ public class SellerAdminMenuService {
             if (isSuperAdmin && user.status() == UserStatus.REJECTED) {
                 keyboard.add(List.of(
                         Map.of(
-                                "text", "🔄 بررسی مجدد " + user.name(),
-                                "callback_data", "access:reopen:" + user.chatId()
+                                "text", BotButton.REOPEN_ACCESS.text() + user.name(),
+                                "callback_data", Action.ACCESS_REOPEN.callback(user.chatId()).encode()
                         )
                 ));
             }
@@ -245,8 +249,8 @@ public class SellerAdminMenuService {
                 if (isSuperAdmin) {
                     keyboard.add(List.of(
                             Map.of(
-                                    "text", "⬆️ ارتقا به مدیر " + user.name(),
-                                    "callback_data", "access:promote:" + user.chatId()
+                                    "text", BotButton.PROMOTE_USER.text() + user.name(),
+                                    "callback_data", Action.ACCESS_PROMOTE.callback(user.chatId()).encode()
                             )
                     ));
                 }
@@ -254,8 +258,8 @@ public class SellerAdminMenuService {
                 // غیرفعال‌سازی فروشنده توسط مدیر یا مدیر اصلی
                 keyboard.add(List.of(
                         Map.of(
-                                "text", "🔴 غیرفعال‌کردن " + user.name(),
-                                "callback_data", "access:deactivate:" + user.chatId()
+                                "text", BotButton.DEACTIVATE_SELLER.text() + user.name(),
+                                "callback_data", Action.ACCESS_DEACTIVATE.callback(user.chatId()).encode()
                         )
                 ));
             }
@@ -267,15 +271,15 @@ public class SellerAdminMenuService {
 
                 keyboard.add(List.of(
                         Map.of(
-                                "text", "⬇️ تنزل به فروشنده " + user.name(),
-                                "callback_data", "access:demote:" + user.chatId()
+                                "text", BotButton.DEMOTE_USER.text() + user.name(),
+                                "callback_data", Action.ACCESS_DEMOTE.callback(user.chatId()).encode()
                         )
                 ));
 
                 keyboard.add(List.of(
                         Map.of(
-                                "text", "🔴 غیرفعال‌کردن مدیر " + user.name(),
-                                "callback_data", "access:deactivate-admin:" + user.chatId()
+                                "text", BotButton.DEACTIVATE_ADMIN.text() + user.name(),
+                                "callback_data", Action.ACCESS_DEACTIVATE_ADMIN.callback(user.chatId()).encode()
                         )
                 ));
             }

@@ -26,9 +26,9 @@ public class TestFixture {
         access = new UserAccessService(mapper, directory.resolve("users.json").toString());
         access.ensureSuperAdmin("super");
         addUser("seller", UserRole.SELLER); addUser("other", UserRole.SELLER); addUser("admin", UserRole.ADMIN);
-        catalog = new ProductCatalogService(mapper);
-        prices = new ProductPriceService(mapper, directory.resolve("prices.json").toString(), access, catalog);
         storage = storage();
+        catalog = new ProductCatalogService(mapper, storage, access);
+        prices = new ProductPriceService(mapper, directory.resolve("prices.json").toString(), access, catalog);
         inventory = new InventoryService(storage, access, catalog);
         customers = new CustomerService(storage);
         cart = new ShoppingCartService(catalog, prices, inventory);

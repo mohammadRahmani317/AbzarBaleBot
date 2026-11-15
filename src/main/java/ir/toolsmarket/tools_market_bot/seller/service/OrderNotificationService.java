@@ -1,5 +1,8 @@
 package ir.toolsmarket.tools_market_bot.seller.service;
 
+import ir.toolsmarket.tools_market_bot.bot.BotCallback.Action;
+import ir.toolsmarket.tools_market_bot.bot.BotCallback;
+import ir.toolsmarket.tools_market_bot.bot.BotButton;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.service.*;
 import ir.toolsmarket.tools_market_bot.util.*;
@@ -32,7 +35,7 @@ public class OrderNotificationService {
                 var order = orders.findForOperator(notification.orderId(), notification.recipientChatId());
                 OrderMessages.send(client, notification.recipientChatId(), "🔔 سفارش جدید تأیید شد\nشماره: "
                         + order.orderId() + "\nمشتری: " + order.customerName() + "\nمبلغ: " + BotFormatting.price(order.totalAmount()),
-                        List.of(List.of(button("📋 مشاهده سفارش", "orders:view:" + order.orderId()))));
+                        List.of(List.of(button(BotButton.VIEW_ORDER.text(), Action.ORDER_VIEW.callback(order.orderId())))));
                 orders.notificationSent(notification);
             } catch (Exception exception) {
                 log.warn("Order notification will retry: order={}, recipient={}, error={}", notification.orderId(),

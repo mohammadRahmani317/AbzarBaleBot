@@ -1,5 +1,8 @@
 package ir.toolsmarket.tools_market_bot.customer.service;
 
+import ir.toolsmarket.tools_market_bot.bot.BotButton;
+import ir.toolsmarket.tools_market_bot.bot.BotCallback;
+import ir.toolsmarket.tools_market_bot.bot.BotCallback.Action;
 import ir.toolsmarket.tools_market_bot.customer.menu.*;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.model.*;
@@ -24,7 +27,12 @@ public class CustomerUpdateService {
     private final ShoppingCartService carts;
     private final CustomerService customers;
     private final OrderService orders;
-    private final Map<String, String> profileInput = new ConcurrentHashMap<>();
+    private enum ProfileInput {
+        EDIT_NAME(true, false), EDIT_PHONE(false, false), CHECKOUT_NAME(true, true), CHECKOUT_PHONE(false, true);
+        final boolean name, checkout;
+        ProfileInput(boolean name, boolean checkout) { this.name = name; this.checkout = checkout; }
+    }
+    private final Map<String, ProfileInput> profileInput = new ConcurrentHashMap<>();
     private long nextUpdateId;
 
     public CustomerUpdateService(@Qualifier("customerBaleBotClient") BaleBotClient client,
@@ -66,23 +74,32 @@ public class CustomerUpdateService {
 
     private void handleMessage(String chatId, String text) {
         if (text.isBlank()) return;
-        if ("/start".equals(text) || "لغو".equals(text)) {
+        BotButton option = BotButton.fromText(text);
+        if (option == BotButton.START || option == BotButton.CANCEL) {
             sessions.removeOrder(chatId); profileInput.remove(chatId); menu.showMainMenu(chatId); return;
         }
-        if ("🛒 سبد خرید".equals(text)) { profileInput.remove(chatId); sessions.removeOrder(chatId); showCart(chatId); return; }
-        if ("👤 اطلاعات من".equals(text)) { showProfile(chatId); return; }
+        if (option == BotButton.CART || option == BotButton.MY_ORDERS || option == BotButton.PROFILE) {
+            sessions.removeOrder(chatId); profileInput.remove(chatId);
+            switch (option) {
+                case CART -> showCart(chatId);
+                case PROFILE -> showProfile(chatId);
+                case MY_ORDERS -> showMyOrders(chatId);
+                default -> { }
+            }
+            return;
+        }
         if (profileInput.containsKey(chatId)) { handleProfileInput(chatId, text); return; }
         OrderState selection = sessions.getOrder(chatId);
         if (selection != null) {
             carts.setQuantity(chatId, selection.getProductId(), BotFormatting.quantity(text));
             sessions.removeOrder(chatId); showCart(chatId); return;
         }
-        var option = BotMenuOption.fromTitle(text).orElse(null);
         if (option != null) {
             switch (option) {
                 case VIEW_PRODUCTS, CREATE_ORDER, BACK_TO_CATEGORIES -> menu.showCategoriesMenu(chatId);
                 case CONTACT_SELLER -> menu.showContactInfo(chatId);
                 case BACK_TO_MAIN, BACK_TO_MAIN_FROM_CATEGORY -> menu.showMainMenu(chatId);
+                default -> client.sendMessage(chatId, "لطفاً از منو استفاده کنید.");
             }
             return;
         }
@@ -91,45 +108,49 @@ public class CustomerUpdateService {
     }
 
     private void handleCallback(String chatId, String data) {
-        String[] parts = data.split(":");
-        if (parts.length == 3 && "product".equals(parts[0])) {
-            int id = BotFormatting.quantity(parts[2]);
-            Product product = catalog.findById(id).orElseThrow(() -> new IllegalArgumentException("محصول پیدا نشد."));
-            if ("detail".equals(parts[1])) menu.showProductDetail(chatId, product);
-            else if ("order".equals(parts[1])) {
-                sessions.startOrder(chatId, id);
-                profileInput.remove(chatId);
+        BotCallback callback = BotCallback.parse(data);
+        switch (callback.action()) {
+            case CUSTOMER_ORDER_VIEW -> OrderMessages.send(client, chatId,
+                    OrderMessages.details(orders.findForCustomer(callback.value(), chatId)), List.of());
+            case PRODUCT_DETAIL -> menu.showProductDetail(chatId, activeProduct(callback.productId()));
+            case PRODUCT_ORDER -> {
+                Product product = activeProduct(callback.productId());
+                sessions.startOrder(chatId, product.id()); profileInput.remove(chatId);
                 client.sendMessage(chatId, "تعداد «" + product.name() + "» را وارد کنید. تعداد جدید جایگزین تعداد قبلی سبد می‌شود. برای انصراف «لغو» را بفرستید.");
             }
-            return;
+            case INVOICE_CONFIRM, INVOICE_CANCEL -> {
+                Order result = callback.action() == Action.INVOICE_CONFIRM
+                        ? orders.confirm(callback.value(), chatId) : orders.cancel(callback.value(), chatId);
+                client.sendMessage(chatId, "سفارش " + result.orderId() + "\nوضعیت: " + result.status().title());
+            }
+            case LEGACY_CONFIRM, LEGACY_CANCEL -> client.sendMessage(chatId, "این دکمه قدیمی است. از دکمه پیش‌فاکتور جدید استفاده کنید.");
+            case CATEGORY -> showProducts(chatId, callback.category());
+            case NAV_CATEGORIES, CART_ADD -> menu.showCategoriesMenu(chatId);
+            case NAV_MAIN -> menu.showMainMenu(chatId);
+            case CART_VIEW -> showCart(chatId);
+            case CART_REMOVE -> { carts.remove(chatId, callback.productId()); showCart(chatId); }
+            case CART_CHECKOUT -> { sessions.removeOrder(chatId); profileInput.remove(chatId); checkout(chatId); }
+            case PROFILE_NAME, PROFILE_PHONE -> {
+                sessions.removeOrder(chatId);
+                boolean name = callback.action() == Action.PROFILE_NAME;
+                profileInput.put(chatId, name ? ProfileInput.EDIT_NAME : ProfileInput.EDIT_PHONE);
+                client.sendMessage(chatId, name ? "نام و نام خانوادگی را وارد کنید:" : "شماره موبایل را وارد کنید:");
+            }
+            default -> throw new IllegalArgumentException("درخواست نامعتبر است.");
         }
-        if (parts.length == 3 && "invoice".equals(parts[0])) {
-            Order result = switch (parts[1]) {
-                case "confirm" -> orders.confirm(parts[2], chatId);
-                case "cancel" -> orders.cancel(parts[2], chatId);
-                default -> throw new IllegalArgumentException("درخواست نامعتبر است.");
-            };
-            client.sendMessage(chatId, "سفارش " + result.orderId() + "\nوضعیت: " + result.status().title());
-            return;
-        }
-        // Old callbacks never act on a different or newly created invoice.
-        if ("order:confirm".equals(data) || "order:cancel".equals(data)) {
-            client.sendMessage(chatId, "این دکمه قدیمی است. از دکمه پیش‌فاکتور جدید استفاده کنید."); return;
-        }
-        if (data.startsWith("category:")) {
-            Arrays.stream(ProductCategory.values()).filter(c -> c.getCode().equals(data.substring(9)))
-                    .findFirst().ifPresent(c -> showProducts(chatId, c)); return;
-        }
-        if ("nav:categories".equals(data) || "cart:add".equals(data)) { menu.showCategoriesMenu(chatId); return; }
-        if ("nav:main".equals(data)) { menu.showMainMenu(chatId); return; }
-        if ("cart:view".equals(data)) { showCart(chatId); return; }
-        if (parts.length == 3 && "cart".equals(parts[0]) && "remove".equals(parts[1])) {
-            carts.remove(chatId, BotFormatting.quantity(parts[2])); showCart(chatId); return;
-        }
-        if ("cart:checkout".equals(data)) { sessions.removeOrder(chatId); checkout(chatId); return; }
-        if ("profile:name".equals(data) || "profile:phone".equals(data)) {
-            profileInput.put(chatId, "profile:name".equals(data) ? "EDIT_NAME" : "EDIT_PHONE");
-            client.sendMessage(chatId, "profile:name".equals(data) ? "نام و نام خانوادگی را وارد کنید:" : "شماره موبایل را وارد کنید:");
+    }
+    private Product activeProduct(int id) {
+        return catalog.findById(id).orElseThrow(() -> new IllegalArgumentException("محصول پیدا نشد."));
+    }
+
+    private void showMyOrders(String chatId) {
+        List<Order> history = orders.listForCustomer(chatId);
+        if (history.isEmpty()) { client.sendMessage(chatId, "هنوز سفارشی ثبت نکرده‌اید."); return; }
+        for (int from = 0; from < history.size(); from += 15) {
+            List<List<Map<String, Object>>> buttons = new ArrayList<>();
+            for (Order order : history.subList(from, Math.min(from + 15, history.size())))
+                buttons.add(List.of(button(order.orderId() + " — " + OrderMessages.statusTitle(order), Action.CUSTOMER_ORDER_VIEW.callback(order.orderId()))));
+            OrderMessages.send(client, chatId, "📦 سفارش‌های قبلی من؛ از جدیدترین به قدیمی‌ترین. برای جزئیات انتخاب کنید:", buttons);
         }
     }
 
@@ -140,9 +161,9 @@ public class CustomerUpdateService {
         var items = carts.items(chatId);
         List<List<Map<String, Object>>> buttons = new ArrayList<>();
         for (OrderItem item : items) buttons.add(List.of(
-                button("✏️ تعداد " + item.productName(), "product:order:" + item.productId()),
-                button("❌ حذف", "cart:remove:" + item.productId())));
-        buttons.add(List.of(button("➕ افزودن محصول", "cart:add"), button("🧾 دریافت پیش‌فاکتور", "cart:checkout")));
+                button(BotButton.EDIT_QUANTITY_PREFIX.text() + item.productName(), Action.PRODUCT_ORDER.callback(item.productId())),
+                button(BotButton.REMOVE.text(), Action.CART_REMOVE.callback(item.productId()))));
+        buttons.add(List.of(button(BotButton.ADD_PRODUCT.text(), Action.CART_ADD.callback()), button(BotButton.CHECKOUT.text(), Action.CART_CHECKOUT.callback())));
         OrderMessages.send(client, chatId, "🛒 سبد خرید\nقیمت‌های فعلی؛ قیمت نهایی هنگام صدور فاکتور ثبت می‌شود.\n\n"
                 + (items.isEmpty() ? "سبد خرید خالی است." : OrderMessages.items(items)
                 + "جمع اقلام دارای قیمت: " + BotFormatting.price(carts.total(chatId))), buttons);
@@ -153,23 +174,23 @@ public class CustomerUpdateService {
         var profile = customers.find(chatId).orElse(null);
         OrderMessages.send(client, chatId, "👤 اطلاعات من\nنام: " + (profile == null ? "—" : profile.name())
                 + "\nتلفن: " + (profile == null ? "—" : profile.phoneNumber()),
-                List.of(List.of(button("✏️ نام", "profile:name"), button("✏️ تلفن", "profile:phone"))));
+                List.of(List.of(button(BotButton.EDIT_NAME.text(), Action.PROFILE_NAME.callback()), button(BotButton.EDIT_PHONE.text(), Action.PROFILE_PHONE.callback()))));
     }
     private void handleProfileInput(String chatId, String text) {
-        String mode = profileInput.get(chatId);
-        boolean name = mode.endsWith("NAME");
+        ProfileInput mode = profileInput.get(chatId);
+        boolean name = mode.name;
         customers.update(chatId, name ? text : null, name ? null : text);
         profileInput.remove(chatId);
-        if (mode.startsWith("CHECKOUT")) checkout(chatId); else showProfile(chatId);
+        if (mode.checkout) checkout(chatId); else showProfile(chatId);
     }
     private void checkout(String chatId) {
         if (carts.quantities(chatId).isEmpty()) throw new IllegalArgumentException("سبد خرید خالی است.");
         Customer profile = customers.find(chatId).orElse(null);
         if (profile == null || profile.name() == null || profile.name().isBlank()) {
-            profileInput.put(chatId, "CHECKOUT_NAME"); client.sendMessage(chatId, "نام و نام خانوادگی را وارد کنید:"); return;
+            profileInput.put(chatId, ProfileInput.CHECKOUT_NAME); client.sendMessage(chatId, "نام و نام خانوادگی را وارد کنید:"); return;
         }
         if (profile.phoneNumber() == null || profile.phoneNumber().isBlank()) {
-            profileInput.put(chatId, "CHECKOUT_PHONE"); client.sendMessage(chatId, "شماره موبایل را وارد کنید:"); return;
+            profileInput.put(chatId, ProfileInput.CHECKOUT_PHONE); client.sendMessage(chatId, "شماره موبایل را وارد کنید:"); return;
         }
         Order invoice = orders.createInvoice(chatId, carts.quantities(chatId));
         if (invoice.invoiceSentAt() != null) {
@@ -181,8 +202,8 @@ public class CustomerUpdateService {
                     + "\nمشتری: " + invoice.customerName() + "\n\n" + OrderMessages.items(invoice.items())
                     + "\nمبلغ نهایی: " + BotFormatting.price(invoice.totalAmount())
                     + "\nاعتبار: ۲ ساعت پس از ارسال موفق این پیام",
-                    List.of(List.of(button("✅ تأیید سفارش", "invoice:confirm:" + invoice.orderId()),
-                            button("❌ لغو سفارش", "invoice:cancel:" + invoice.orderId()))));
+                    List.of(List.of(button(BotButton.CONFIRM_ORDER.text(), Action.INVOICE_CONFIRM.callback(invoice.orderId())),
+                            button(BotButton.CANCEL_ORDER.text(), Action.INVOICE_CANCEL.callback(invoice.orderId())))));
             orders.markInvoiceSent(invoice.orderId(), chatId);
             carts.clear(chatId);
         } catch (Exception exception) {

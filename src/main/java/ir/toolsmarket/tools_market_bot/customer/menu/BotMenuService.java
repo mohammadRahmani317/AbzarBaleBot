@@ -1,9 +1,13 @@
 package ir.toolsmarket.tools_market_bot.customer.menu;
 
+import ir.toolsmarket.tools_market_bot.bot.BotCallback.Action;
+import ir.toolsmarket.tools_market_bot.bot.BotButton;
 import ir.toolsmarket.tools_market_bot.model.Product;
 import ir.toolsmarket.tools_market_bot.model.ProductCategory;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.service.ProductPriceService;
+import ir.toolsmarket.tools_market_bot.service.InventoryService;
+import ir.toolsmarket.tools_market_bot.util.BotFormatting;
 import java.math.BigDecimal;
 
 import org.springframework.stereotype.Service;
@@ -22,9 +26,12 @@ public class BotMenuService {
     private final BaleBotClient baleBotClient;
     private final ProductPriceService productPriceService;
 
-    public BotMenuService(BaleBotClient baleBotClient, ProductPriceService productPriceService) {
+    private final InventoryService inventory;
+
+    public BotMenuService(BaleBotClient baleBotClient, ProductPriceService productPriceService, InventoryService inventory) {
         this.baleBotClient = baleBotClient;
         this.productPriceService = productPriceService;
+        this.inventory = inventory;
     }
 
     // نمایش منوی اصلی
@@ -33,7 +40,8 @@ public class BotMenuService {
         List<List<String>> keyboard = List.of(
                 List.of(BotMenuOption.VIEW_PRODUCTS.getTitle()),
                 List.of(BotMenuOption.CREATE_ORDER.getTitle()),
-                List.of("🛒 سبد خرید", "👤 اطلاعات من"),
+                List.of(BotButton.CART.text(), BotButton.PROFILE.text()),
+                List.of(BotMenuOption.MY_ORDERS.getTitle()),
                 List.of(BotMenuOption.CONTACT_SELLER.getTitle())
         );
 
@@ -94,15 +102,15 @@ public class BotMenuService {
             inlineKeyboard.add(List.of(
                     Map.of(
                             "text", product.name(),
-                            "callback_data", "product:detail:" + product.id()
+                            "callback_data", Action.PRODUCT_DETAIL.callback(product.id()).encode()
                     )
             ));
         }
 
         inlineKeyboard.add(List.of(
                 Map.of(
-                        "text", "🔙 بازگشت به دسته‌بندی‌ها",
-                        "callback_data", "nav:categories"
+                        "text", BotButton.BACK_TO_CATEGORIES.text(),
+                        "callback_data", Action.NAV_CATEGORIES.callback().encode()
                 )
         ));
 
@@ -161,14 +169,14 @@ public class BotMenuService {
         List<List<Map<String, Object>>> inlineKeyboard = List.of(
                 List.of(
                         Map.of(
-                                "text", "📦 ثبت سفارش این محصول",
-                                "callback_data", "product:order:" + product.id()
+                                "text", BotButton.ORDER_PRODUCT.text(),
+                                "callback_data", Action.PRODUCT_ORDER.callback(product.id()).encode()
                         )
                 ),
                 List.of(
                         Map.of(
-                                "text", "🔙 بازگشت به محصولات",
-                                "callback_data", "category:" + product.categoryCode()
+                                "text", BotButton.BACK_TO_PRODUCTS.text(),
+                                "callback_data", Action.CATEGORY.callback(product.categoryCode()).encode()
                         )
                 )
         );
@@ -182,13 +190,17 @@ public class BotMenuService {
                 
                 %s
                 
+                🏷 برند: %s
                 💰 قیمت: %s
+                📦 موجودی قابل فروش: %s
                 """.formatted(
                 product.name(),
                 product.description(),
+                product.brand().isBlank() ? "ثبت نشده" : product.brand(),
                 productPriceService.findCurrentPrice(product.id())
                         .map(BotMenuService::formatPrice)
-                        .orElse("استعلام قیمت")
+                        .orElse("استعلام قیمت"),
+                BotFormatting.number(inventory.find(product.id()).availableQuantity())
         );
 
         var image = new org.springframework.core.io.ClassPathResource(
@@ -196,7 +208,7 @@ public class BotMenuService {
         );
 
         try {
-            if (image.exists()) {
+            if (!product.imagePath().isBlank() && image.exists()) {
 
                 // اندازه‌گیری زمان خواندن عکس
                 long readStart = System.currentTimeMillis();
@@ -275,12 +287,12 @@ public class BotMenuService {
         List<List<Map<String, Object>>> inlineKeyboard = List.of(
                 List.of(
                         Map.of(
-                                "text", "✅ تأیید سفارش",
-                                "callback_data", "order:confirm"
+                                "text", BotButton.CONFIRM_ORDER.text(),
+                                "callback_data", Action.LEGACY_CONFIRM.callback().encode()
                         ),
                         Map.of(
-                                "text", "❌ لغو سفارش",
-                                "callback_data", "order:cancel"
+                                "text", BotButton.CANCEL_ORDER.text(),
+                                "callback_data", Action.LEGACY_CANCEL.callback().encode()
                         )
                 )
         );

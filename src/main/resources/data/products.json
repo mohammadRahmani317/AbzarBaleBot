@@ -1,50 +1,200 @@
 [
   {
     "id": 1,
-    "categoryCode": "POWER_TOOLS",
-    "name": "دریل شارژی",
-    "description": "دریل شارژی مناسب مصارف عمومی",
+    "categoryCode": "HOME_SUPPLIES",
+    "name": "میخ چسبی و قلاب چسبی",
+    "description": "مناسب نصب و آویزان کردن وسایل بدون نیاز به سوراخ‌کاری",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/Drill.jpg"
+    "imagePath": "images/products/adhesive-hook.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   },
   {
     "id": 2,
-    "categoryCode": "POWER_TOOLS",
-    "name": "مینی‌فرز",
-    "description": "مینی‌فرز مناسب برش و سایش",
+    "categoryCode": "HAND_TOOLS",
+    "name": "آچار فرانسه ۱۰ اینچ",
+    "description": "آچار قابل تنظیم مناسب باز و بسته کردن انواع مهره و اتصالات",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/Grinder.jpg"
+    "imagePath": "images/products/adjustable-wrench.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   },
   {
     "id": 3,
     "categoryCode": "HAND_TOOLS",
-    "name": "انبردست",
-    "description": "انبردست عمومی",
+    "name": "ست پیچ‌گوشتی دوسو و چهارسو",
+    "description": "مجموعه پیچ‌گوشتی دوسو و چهارسو برای مصارف عمومی و تعمیرات",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/Pliers.jpg"
+    "imagePath": "images/products/screwdriver-set.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   },
   {
     "id": 4,
     "categoryCode": "HAND_TOOLS",
-    "name": "پیچ‌گوشتی دوسو",
-    "description": "پیچ‌گوشتی دوسو",
+    "name": "پیچ‌گوشتی تکی دوسو",
+    "description": "مناسب باز و بسته کردن پیچ‌های دوسو",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/screwdriver-flat.jpg"
+    "imagePath": "images/products/flat-screwdriver.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   },
   {
     "id": 5,
     "categoryCode": "HAND_TOOLS",
-    "name": "پیچ‌گوشتی چهارسو",
-    "description": "پیچ‌گوشتی چهارسو",
+    "name": "پیچ‌گوشتی تکی چهارسو",
+    "description": "مناسب باز و بسته کردن پیچ‌های چهارسو",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/screwdriver-phillips.jpg"
+    "imagePath": "images/products/phillips-screwdriver.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   },
   {
     "id": 6,
     "categoryCode": "HAND_TOOLS",
-    "name": "متر ۵ متری",
-    "description": "متر اندازه‌گیری ۵ متری",
+    "name": "انبردست ۸ اینچ",
+    "description": "مناسب گرفتن، نگه داشتن و خم کردن قطعات",
     "priceLabel": "استعلام قیمت",
-    "imagePath": "images/products/measuring-tape.jpg"
+    "imagePath": "images/products/combination-pliers.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 7,
+    "categoryCode": "MEASURING_TOOLS",
+    "name": "متر ۵ متری",
+    "description": "متر نواری مناسب اندازه‌گیری در کارهای فنی و ساختمانی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/measuring-tape.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 8,
+    "categoryCode": "HAND_TOOLS",
+    "name": "ست آچار آلن",
+    "description": "مجموعه آچار آلن در اندازه‌های مختلف",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/allen-key-set.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 9,
+    "categoryCode": "HAND_TOOLS",
+    "name": "کاتر تیغه‌کشویی",
+    "description": "کاتر دستی مناسب برش کارتن، کاغذ و مواد مشابه",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/utility-knife.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 10,
+    "categoryCode": "TOOL_ACCESSORIES",
+    "name": "کیف ابزار",
+    "description": "مناسب نگهداری و حمل ابزارهای دستی و لوازم فنی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/tool-bag.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 11,
+    "categoryCode": "HOME_SUPPLIES",
+    "name": "علم شیر",
+    "description": "قطعه جانبی شیر آب مناسب آشپزخانه و سرویس بهداشتی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/faucet-spout.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 12,
+    "categoryCode": "HOME_SUPPLIES",
+    "name": "قفل کتابی",
+    "description": "مناسب استفاده برای درب، انبار و تجهیزات مختلف",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/disc-padlock.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 13,
+    "categoryCode": "HOME_SUPPLIES",
+    "name": "قفل آویز",
+    "description": "مناسب استفاده روزمره برای درب، کمد و جعبه",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/padlock.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 14,
+    "categoryCode": "SAFETY_EQUIPMENT",
+    "name": "محافظ گوش",
+    "description": "مناسب کاهش صدای محیط در کارگاه‌ها و محیط‌های پر سروصدا",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/ear-protection.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 15,
+    "categoryCode": "CONSUMABLES",
+    "name": "چسب پهن",
+    "description": "چسب نواری پهن مناسب بسته‌بندی و مصارف عمومی",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/packing-tape.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 16,
+    "categoryCode": "CONSUMABLES",
+    "name": "چسب ۱۲۳",
+    "description": "مناسب چسباندن سریع قطعات و سطوح مختلف",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/123-glue.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 17,
+    "categoryCode": "HAND_TOOLS",
+    "name": "ست آچار یکسر تخت و یکسر رینگی",
+    "description": "مجموعه آچار یکسر تخت و یکسر رینگی در اندازه‌های مختلف",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/combination-wrench-set.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
+  },
+  {
+    "id": 18,
+    "categoryCode": "HAND_TOOLS",
+    "name": "انبر قفلی ۱۰ اینچ",
+    "description": "مناسب نگه داشتن و ثابت کردن قطعات",
+    "priceLabel": "استعلام قیمت",
+    "imagePath": "images/products/locking-pliers.jpg",
+    "brand": "",
+    "stockQuantity": 0,
+    "deleted": false
   }
 ]

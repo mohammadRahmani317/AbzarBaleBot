@@ -224,6 +224,12 @@ public class UserAccessService {
         return role == UserRole.SELLER || role == UserRole.ADMIN || role == UserRole.SUPER_ADMIN;
     }
 
+    public User requirePriceManager(String chatId) {
+        if (!hasPermission(chatId, UserPermission.PRICE_MANAGER))
+            throw new IllegalArgumentException("شما اجازه مدیریت محصولات و موجودی را ندارید.");
+        return requireOperator(chatId);
+    }
+
     public User requireOperator(String chatId) {
         return findByChatId(chatId).filter(user -> user.status() == UserStatus.APPROVED)
                 .filter(user -> isOperationalRole(user.role()))

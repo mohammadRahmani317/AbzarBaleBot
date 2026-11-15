@@ -39,7 +39,7 @@ public class OrderService {
             if (customer == null || !customer.complete()) throw new IllegalArgumentException("ابتدا نام و شماره تماس را ثبت کنید.");
             List<OrderItem> items = new ArrayList<>();
             for (var entry : quantities.entrySet()) {
-                var product = catalog.findById(entry.getKey()).orElseThrow(() -> new IllegalArgumentException("محصول پیدا نشد."));
+                var product = ProductCatalogService.requireActive(state, entry.getKey());
                 int quantity = entry.getValue();
                 if (quantity <= 0) throw new IllegalArgumentException("تعداد باید مثبت باشد.");
                 var price = currentPrices.get(product.id());
@@ -139,6 +139,29 @@ public class OrderService {
 
     private boolean due(Order order) {
         return order.expiresAt() != null && !order.expiresAt().isAfter(clock.instant());
+    }
+
+    public List<Order> listForCustomer(String customerChatId) {
+        requireCustomerId(customerChatId);
+        expireInvoices();
+        return storage.snapshot().orders().values().stream()
+                .filter(order -> customerChatId.equals(order.chatId()))
+                .sorted(Comparator.comparing(Order::createdAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Order::orderId))
+                .toList();
+    }
+
+    public Order findForCustomer(String id, String customerChatId) {
+        requireCustomerId(customerChatId);
+        expireInvoices();
+        Order order = storage.snapshot().orders().get(id);
+        // Use the same response for missing and foreign orders; include legacy orders read-only.
+        if (order == null || !customerChatId.equals(order.chatId()))
+            throw new IllegalArgumentException("سفارش پیدا نشد.");
+        return order;
+    }
+    private static void requireCustomerId(String id) {
+        if (id == null || id.isBlank()) throw new IllegalArgumentException("شناسه مشتری نامعتبر است.");
     }
 
     public List<Order> list(String actor, Set<OrderStatus> statuses) {

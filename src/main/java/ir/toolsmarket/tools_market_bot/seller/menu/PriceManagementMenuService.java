@@ -1,5 +1,8 @@
 package ir.toolsmarket.tools_market_bot.seller.menu;
 
+import ir.toolsmarket.tools_market_bot.bot.BotCallback.Action;
+import ir.toolsmarket.tools_market_bot.bot.BotCallback;
+import ir.toolsmarket.tools_market_bot.bot.BotButton;
 import ir.toolsmarket.tools_market_bot.integration.bale.BaleBotClient;
 import ir.toolsmarket.tools_market_bot.model.Product;
 import ir.toolsmarket.tools_market_bot.model.ProductPriceHistory;
@@ -87,14 +90,14 @@ public class PriceManagementMenuService {
                     .append('\n');
 
             keyboard.add(List.of(Map.of(
-                    "text", "✏️ تغییر قیمت " + product.name(),
-                    "callback_data", "price:edit:" + product.id()
+                    "text", BotButton.CHANGE_PRICE.text() + product.name(),
+                    "callback_data", Action.PRICE_EDIT.callback(product.id()).encode()
             )));
         }
 
         keyboard.add(List.of(Map.of(
-                "text", "🔙 منوی اصلی",
-                "callback_data", "price:menu"
+                "text", BotButton.BACK_MAIN_SHORT.text(),
+                "callback_data", Action.PRICE_MENU.callback().encode()
         )));
 
         baleBotClient.sendMessage(
@@ -239,17 +242,17 @@ public class PriceManagementMenuService {
         List<List<Map<String, Object>>> keyboard =
                 new ArrayList<>();
 
-        for (Product product : productCatalogService.findAll()) {
+        for (Product product : productCatalogService.findAllIncludingDeleted()) {
 
             keyboard.add(List.of(Map.of(
-                    "text", "📊 " + product.name(),
-                    "callback_data", "price:history:" + product.id()
+                    "text", BotButton.PRICE_CHART_PREFIX.text() + product.name(),
+                    "callback_data", Action.PRICE_HISTORY.callback(product.id()).encode()
             )));
         }
 
         keyboard.add(List.of(Map.of(
-                "text", "🔙 منوی مدیریت",
-                "callback_data", "price:menu"
+                "text", BotButton.MANAGEMENT_MENU.text(),
+                "callback_data", Action.PRICE_MENU.callback().encode()
         )));
 
         baleBotClient.sendMessage(
@@ -279,7 +282,7 @@ public class PriceManagementMenuService {
         }
 
         Product product = productCatalogService
-                .findById(productId)
+                .findByIdIncludingDeleted(productId)
                 .orElse(null);
 
         if (product == null) {

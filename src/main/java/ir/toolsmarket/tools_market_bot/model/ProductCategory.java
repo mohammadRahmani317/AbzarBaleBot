@@ -5,10 +5,17 @@ import java.util.Optional;
 
 public enum ProductCategory {
 
-    POWER_TOOLS("POWER_TOOLS", "🔌 ابزار برقی"),
     HAND_TOOLS("HAND_TOOLS", "🛠 ابزار دستی"),
-    DRILL_BITS("DRILL_BITS", "🔩 مته و سری"),
-    SAFETY_EQUIPMENT("SAFETY_EQUIPMENT", "🧤 تجهیزات ایمنی");
+
+    HOME_SUPPLIES("HOME_SUPPLIES", "🏠 لوازم کاربردی منزل"),
+
+    CONSUMABLES("CONSUMABLES", "🧴 چسب و لوازم مصرفی"),
+
+    TOOL_ACCESSORIES("TOOL_ACCESSORIES", "🧰 کیف و لوازم ابزار"),
+
+    SAFETY_EQUIPMENT("SAFETY_EQUIPMENT", "🦺 تجهیزات ایمنی"),
+
+    MEASURING_TOOLS("MEASURING_TOOLS", "📏 ابزار اندازه‌گیری");
 
     private final String code;
     private final String title;

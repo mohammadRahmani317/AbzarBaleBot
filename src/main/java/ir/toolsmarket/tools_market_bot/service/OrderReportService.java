@@ -34,7 +34,7 @@ public class OrderReportService {
             text.append(entry.getKey()).append(": ").append(BotFormatting.price(value)).append("\n");
         }
         text.append("\n📦 گزارش محصولات\n");
-        for (Product product : catalog.findAll()) {
+        for (Product product : catalog.findAllIncludingDeleted()) {
             ProductInventory stock = state.inventory().getOrDefault(product.id(), new ProductInventory(product.id(), 0, 0, null));
             text.append(product.name()).append("\nکل: ").append(BotFormatting.number(stock.totalQuantity()))
                     .append(" | رزرو: ").append(BotFormatting.number(stock.reservedQuantity()))
